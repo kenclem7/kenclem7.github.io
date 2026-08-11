@@ -46,10 +46,10 @@
   .chartbox { position: relative; width: 1080px; }
   svg text { font-family: inherit; }
   #tip { position: absolute; display: none; z-index: 20; background: rgba(255,255,255,.97); border: 1px solid #b9c2cb;
-         border-radius: 6px; box-shadow: 0 3px 10px rgba(0,0,0,.15); padding: 7px 10px; font-size: 12.5px; line-height: 1.5;
+         border-radius: 8px; box-shadow: 0 3px 10px rgba(0,0,0,.15); padding: 11px 15px; font-size: 19px; line-height: 1.5;
          pointer-events: none; white-space: nowrap; }
   #tip .t { font-weight: 600; }
-  #tip .hrrr { color: #b35c00; font-size: 11.5px; }
+  #tip .hrrr { color: #b35c00; font-size: 17px; }
   .foot { font-size: 11.5px; color: #98a2ad; padding: 10px 2px 6px; }
   .foot a { color: #1976d2; text-decoration: none; }
   .foot a:hover { text-decoration: underline; }
@@ -427,7 +427,7 @@ function bindPointer() {
       " · gusts " + Math.round(data.wgst[i]) + "<br>" +
       "☁️ " + Math.round(data.cloud[i]) + "%" +
       (data.prob[i] !== null ? " · precip chance " + Math.round(data.prob[i]) + "%" : "") + "<br>" +
-      "Accum " + fmtIn(data.accum[i]) + " in";
+      "💧 Accum " + fmtIn(data.accum[i]) + " in";
     if (showHrrr && data.hrrr.wspd[i] !== null) {
       html += '<br><span class="hrrr">HRRR: ' + Math.round(data.hrrr.wspd[i]) + " mph from " +
               compass(data.hrrr.wdir[i]) + " · " + Math.round(data.hrrr.temp[i]) + "° · cloud " +
@@ -435,11 +435,11 @@ function bindPointer() {
     }
     tip.innerHTML = html;
     tip.style.display = "block";
-    var bw = box.clientWidth, tw = tip.offsetWidth;
+    var bw = box.clientWidth, tw = tip.offsetWidth, th = tip.offsetHeight;
     var lx = x(i) + 14;
     if (lx + tw > W - 4) lx = x(i) - tw - 14;
     tip.style.left = lx + "px";
-    tip.style.top = Math.max(SEC.days.h + 6, Math.min(py - 20, BOTTOM - 110)) + "px";
+    tip.style.top = Math.max(SEC.days.h + 6, Math.min(py - 20, BOTTOM - th - 4)) + "px";
   }
   function hide() { tip.style.display = "none"; xh.setAttribute("opacity", "0"); }
   svg.addEventListener("pointermove", move);
