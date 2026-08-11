@@ -274,14 +274,28 @@ function render() {
   }
   if (started) s.push('<path d="' + pa.join("") + "L" + xb(DAYS).toFixed(1) + " " + yP(0).toFixed(1) + 'Z" fill="' + COL.precipFill + '" fill-opacity="0.75"/>');
   s.push('<path d="' + linePath(data.p, yP) + '" fill="none" stroke="' + COL.precipLine + '" stroke-width="1.2"/>');
-  /* monthly average overlay: flat step per month at that month's mean daily precip */
-  var mp = [];
-  for (m = 0; m < 12; m++) {
-    var mv = yP(data.mtot[m] / MDAYS[m]).toFixed(1);
-    mp.push((m ? "L" : "M") + xb(MSTART[m]).toFixed(1) + " " + mv + "L" + xb(MSTART[m + 1]).toFixed(1) + " " + mv);
+  /* weekly average overlay, smoothed: 7-day circular mean, then a triangular kernel pass */
+  var wk = [], sm = [], j, acc, cnt, vv, wgt, vsum, wsum;
+  for (i = 0; i < DAYS; i++) {
+    acc = 0; cnt = 0;
+    for (j = -3; j <= 3; j++) {
+      vv = data.p[(i + j + DAYS) % DAYS];
+      if (vv !== null) { acc += vv; cnt++; }
+    }
+    wk.push(cnt ? acc / cnt : null);
   }
-  s.push('<path d="' + mp.join("") + '" fill="none" stroke="' + COL.mavg + '" stroke-width="2.2"/>');
-  legend(s, SEC.precip, [[COL.precipFill, "Avg Precipitation (in/day)"], [COL.mavg, "Monthly Average (in/day)"]]);
+  for (i = 0; i < DAYS; i++) {
+    vsum = 0; wsum = 0;
+    for (j = -10; j <= 10; j++) {
+      vv = wk[(i + j + DAYS) % DAYS];
+      if (vv === null) continue;
+      wgt = 11 - Math.abs(j);
+      vsum += vv * wgt; wsum += wgt;
+    }
+    sm.push(wsum ? vsum / wsum : null);
+  }
+  s.push('<path d="' + linePath(sm, yP) + '" fill="none" stroke="' + COL.mavg + '" stroke-width="2.2"/>');
+  legend(s, SEC.precip, [[COL.precipFill, "Avg Precipitation (in/day)"], [COL.mavg, "Weekly Average (smoothed)"]]);
 
   /* crosshair + hover capture */
   s.push('<line id="xh" x1="-10" y1="' + SEC.temp.y + '" x2="-10" y2="' + BOTTOM + '" stroke="#f6a04d" stroke-width="1.4" opacity="0"/>');
