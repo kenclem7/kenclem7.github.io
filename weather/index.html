@@ -50,6 +50,8 @@
          pointer-events: none; white-space: nowrap; }
   #tip .t { font-weight: 600; }
   #tip .hrrr { color: #b35c00; font-size: 17px; }
+  #chart .rsz { cursor: nwse-resize; touch-action: none; }
+  #chart .rsz:hover line { stroke: #5b6672; }
   .foot { font-size: 11.5px; color: #98a2ad; padding: 10px 2px 6px; }
   .foot a { color: #1976d2; text-decoration: none; }
   .foot a:hover { text-decoration: underline; }
@@ -84,16 +86,25 @@
 <script>
 "use strict";
 /* ---------- constants ---------- */
-var W = 1080, PADL = 46, PADR = 12, PLOTW = W - PADL - PADR, HOURS = 240;
-var SEC = {                                  /* vertical layout of the chart stack */
-  days:  { y: 0,   h: 110 },
-  temp:  { y: 110, h: 150 },                 /* flush against the day strip, no gap */
-  wind:  { y: 318, h: 140 },
-  cloud: { y: 516, h: 140 },
-  accum: { y: 714, h: 72  }
-};
-var BOTTOM = SEC.accum.y + SEC.accum.h;      /* 766 */
-var SVGH = BOTTOM + 34;
+var PADL = 46, PADR = 12, HOURS = 240;
+/* chart sizes are user-resizable via corner grips; these defaults are also the minimums */
+var DEFSIZE = { width: 1080, temp: 150, wind: 140, cloud: 140, accum: 72 };
+var sizes = load("bw_sizes") || {};
+Object.keys(DEFSIZE).forEach(function (k) { if (!(sizes[k] >= DEFSIZE[k])) sizes[k] = DEFSIZE[k]; });
+var W, PLOTW, SEC, BOTTOM, SVGH;
+function applyLayout() {
+  W = Math.min(sizes.width, 2600);
+  PLOTW = W - PADL - PADR;
+  var GAP = 58, y;                           /* gap holds each chart's legend row */
+  SEC = { days: { y: 0, h: 110 }, temp: { y: 110, h: sizes.temp } };  /* temp flush against the day strip */
+  y = 110 + sizes.temp;
+  SEC.wind  = { y: y + GAP, h: sizes.wind };  y += GAP + sizes.wind;
+  SEC.cloud = { y: y + GAP, h: sizes.cloud }; y += GAP + sizes.cloud;
+  SEC.accum = { y: y + GAP, h: sizes.accum };
+  BOTTOM = SEC.accum.y + SEC.accum.h;
+  SVGH = BOTTOM + 34;
+}
+applyLayout();
 var COL = {
   temp: "#cf3049", feels: "#9b59b6", windLine: "#93c4ec", windArrow: "#14396e", gust: "#b6c3d2",
   cloudFill: "#c9ced4", cloudLine: "#8a939c", probFill: "#8fd0f0", probLine: "#2a92cf",
@@ -289,6 +300,8 @@ function build(ec, pr, hr) {
 /* ---------- render ---------- */
 function render() {
   if (!data) return;
+  applyLayout();
+  $("chartbox").style.width = W + "px";
   var s = [], i, d;
   s.push('<svg id="wx" width="' + W + '" height="' + SVGH + '" viewBox="0 0 ' + W + " " + SVGH + '">');
 
@@ -374,6 +387,17 @@ function render() {
   /* crosshair (hidden until hover/touch) */
   s.push('<line id="xh" x1="-10" y1="' + SEC.temp.y + '" x2="-10" y2="' + BOTTOM + '" stroke="#f6a04d" stroke-width="1.4" opacity="0"/>');
   s.push('<rect x="0" y="0" width="' + W + '" height="' + SVGH + '" fill="transparent"/>');
+  /* resize grips, drawn last so they sit on top of the hover-capture rect */
+  ["temp", "wind", "cloud", "accum"].forEach(function (k) {
+    var sec = SEC[k];
+    var g = ['<g class="rsz" data-sec="' + k + '" transform="translate(' + (W - PADR - 3) + "," + (sec.y + sec.h - 3) + ')">',
+             '<rect x="-16" y="-16" width="20" height="20" fill="transparent"/>'];
+    for (var gl = 0; gl < 3; gl++) {
+      var o = 3 + gl * 4;
+      g.push('<line x1="' + (-o) + '" y1="1" x2="1" y2="' + (-o) + '" stroke="#9aa5b1" stroke-width="1.6"/>');
+    }
+    s.push(g.join("") + "</g>");
+  });
   s.push("</svg>");
   $("chart").innerHTML = s.join("");
 
@@ -415,6 +439,7 @@ function legend(s, sec, items) {
 function bindPointer() {
   var svg = $("wx"), tip = $("tip"), xh = $("xh"), box = $("chartbox");
   function move(ev) {
+    if (resizing) return;                     /* no tooltip while dragging a grip */
     var r = svg.getBoundingClientRect();
     var px = ev.clientX - r.left, py = ev.clientY - r.top;
     if (px < PADL - 4 || px > W - PADR + 4 || py < SEC.days.h || py > BOTTOM) { hide(); return; }
@@ -443,9 +468,34 @@ function bindPointer() {
   }
   function hide() { tip.style.display = "none"; xh.setAttribute("opacity", "0"); }
   svg.addEventListener("pointermove", move);
-  svg.addEventListener("pointerdown", move);
+  svg.addEventListener("pointerdown", function (ev) {
+    var h = ev.target.closest ? ev.target.closest(".rsz") : null;
+    if (!h) { move(ev); return; }
+    ev.preventDefault();
+    var k = h.getAttribute("data-sec");
+    resizing = { sec: k, x0: ev.clientX, y0: ev.clientY, h0: sizes[k], w0: sizes.width };
+    hide();
+  });
+  svg.addEventListener("dblclick", function (ev) {  /* double-click a grip: back to defaults */
+    if (ev.target.closest && ev.target.closest(".rsz")) {
+      Object.keys(DEFSIZE).forEach(function (k) { sizes[k] = DEFSIZE[k]; });
+      save("bw_sizes", sizes); render();
+    }
+  });
   svg.addEventListener("pointerleave", hide);
 }
+
+/* ---------- chart resize drag (window-level so re-renders mid-drag don't drop it) ---------- */
+var resizing = null, resizeRaf = 0;
+window.addEventListener("pointermove", function (ev) {
+  if (!resizing) return;
+  sizes[resizing.sec] = Math.round(Math.max(DEFSIZE[resizing.sec], resizing.h0 + (ev.clientY - resizing.y0)));
+  sizes.width = Math.round(Math.min(2600, Math.max(DEFSIZE.width, resizing.w0 + (ev.clientX - resizing.x0))));
+  if (!resizeRaf) resizeRaf = requestAnimationFrame(function () { resizeRaf = 0; render(); });
+});
+window.addEventListener("pointerup", function () {
+  if (resizing) { resizing = null; save("bw_sizes", sizes); }
+});
 
 /* ---------- location search + recents ---------- */
 function renderRecents() {
