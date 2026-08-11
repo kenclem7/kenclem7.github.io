@@ -23,6 +23,9 @@
   .searchwrap { position: relative; flex: 0 1 300px; min-width: 230px; }
   #q { width: 100%; padding: 8px 10px; font-size: 14px; border: 1px solid #c5ccd4; border-radius: 6px; outline: none; }
   #q:focus { border-color: #1976d2; }
+  .pagelink { text-align: right; font-size: 12.5px; margin-top: 5px; }
+  .pagelink a { color: #1976d2; text-decoration: none; }
+  .pagelink a:hover { text-decoration: underline; }
   #results { position: absolute; top: 100%; left: 0; right: 0; z-index: 30; background: #fff; border: 1px solid #c5ccd4;
              border-radius: 0 0 6px 6px; box-shadow: 0 6px 16px rgba(0,0,0,.12); max-height: 240px; overflow-y: auto; }
   #results div { padding: 8px 10px; font-size: 13px; cursor: pointer; }
@@ -64,6 +67,7 @@
       <div class="searchwrap">
         <input id="q" type="text" placeholder="Add location (city or town)…" autocomplete="off" spellcheck="false">
         <div id="results" style="display:none"></div>
+        <div class="pagelink"><a href="/weather1/">10 Day Forecast</a></div>
       </div>
       <div id="recents"></div>
     </header>
@@ -101,7 +105,7 @@ function applyLayout() {
 applyLayout();
 var COL = {
   hi: "#cf3049", lo: "#3f74ad", band: "#f5f7f9", monthline: "#dcdfe3", grid: "#e8eaed",
-  range: "#f7e6e9", precipFill: "#9bd7ea", precipLine: "#3fa7c9"
+  range: "#f7e6e9", precipFill: "#9bd7ea", precipLine: "#3fa7c9", mavg: "#22729c"
 };
 var DEFAULT_LOC = { name: "Kirkland", admin1: "Washington", cc: "US", lat: 47.68, lon: -122.19, elev: 47 };
 
@@ -270,7 +274,14 @@ function render() {
   }
   if (started) s.push('<path d="' + pa.join("") + "L" + xb(DAYS).toFixed(1) + " " + yP(0).toFixed(1) + 'Z" fill="' + COL.precipFill + '" fill-opacity="0.75"/>');
   s.push('<path d="' + linePath(data.p, yP) + '" fill="none" stroke="' + COL.precipLine + '" stroke-width="1.2"/>');
-  legend(s, SEC.precip, [[COL.precipFill, "Avg Precipitation (in/day)"]]);
+  /* monthly average overlay: flat step per month at that month's mean daily precip */
+  var mp = [];
+  for (m = 0; m < 12; m++) {
+    var mv = yP(data.mtot[m] / MDAYS[m]).toFixed(1);
+    mp.push((m ? "L" : "M") + xb(MSTART[m]).toFixed(1) + " " + mv + "L" + xb(MSTART[m + 1]).toFixed(1) + " " + mv);
+  }
+  s.push('<path d="' + mp.join("") + '" fill="none" stroke="' + COL.mavg + '" stroke-width="2.2"/>');
+  legend(s, SEC.precip, [[COL.precipFill, "Avg Precipitation (in/day)"], [COL.mavg, "Monthly Average (in/day)"]]);
 
   /* crosshair + hover capture */
   s.push('<line id="xh" x1="-10" y1="' + SEC.temp.y + '" x2="-10" y2="' + BOTTOM + '" stroke="#f6a04d" stroke-width="1.4" opacity="0"/>');
@@ -285,7 +296,7 @@ function render() {
   var lonW = Math.abs(loc.lon).toFixed(2) + "°" + (loc.lon >= 0 ? "E" : "W");
   var elev = loc.elev !== undefined && loc.elev !== null ? " · Elev " + Math.round(loc.elev * 3.28084) + " ft" : "";
   $("locmeta").innerHTML = latN + ", " + lonW + elev +
-    ' · <button title="Re-fetch" onclick="loadAverages(true)">⟳ refresh</button> · <a href="/weather/">10-day forecast →</a>';
+    ' · <button title="Re-fetch" onclick="loadAverages(true)">⟳ refresh</button>';
   renderRecents();
   var scr = document.querySelector(".scroller");
   if (scr && Math.max(900, scr.clientWidth - 2) !== W && !inRefit) {
