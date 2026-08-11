@@ -86,10 +86,10 @@
 var W = 1080, PADL = 46, PADR = 12, PLOTW = W - PADL - PADR, HOURS = 240;
 var SEC = {                                  /* vertical layout of the chart stack */
   days:  { y: 0,   h: 110 },
-  temp:  { y: 140, h: 150 },
-  wind:  { y: 348, h: 140 },
-  cloud: { y: 546, h: 140 },
-  accum: { y: 744, h: 96  }
+  temp:  { y: 110, h: 150 },                 /* flush against the day strip, no gap */
+  wind:  { y: 318, h: 140 },
+  cloud: { y: 516, h: 140 },
+  accum: { y: 714, h: 96  }
 };
 var BOTTOM = SEC.accum.y + SEC.accum.h;      /* 766 */
 var SVGH = BOTTOM + 34;
