@@ -9,7 +9,7 @@
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif; background: #eef1f4; color: #222; }
-  .page { max-width: 1140px; margin: 0 auto; padding: 14px 10px 40px; }
+  .page { margin: 0 auto; padding: 14px 20px 30px; }   /* full browser width, 20px side margins */
   .card { background: #fff; border: 1px solid #dde2e8; border-radius: 8px; padding: 16px 16px 8px; }
 
   header { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: flex-start; margin-bottom: 6px; }
@@ -50,7 +50,7 @@
          pointer-events: none; white-space: nowrap; }
   #tip .t { font-weight: 600; }
   #tip .hrrr { color: #b35c00; font-size: 17px; }
-  #chart .rsz { cursor: nwse-resize; touch-action: none; }
+  #chart .rsz { cursor: ns-resize; touch-action: none; }
   #chart .rsz:hover line { stroke: #5b6672; }
   .foot { font-size: 11.5px; color: #98a2ad; padding: 10px 2px 6px; }
   .foot a { color: #1976d2; text-decoration: none; }
@@ -87,13 +87,16 @@
 "use strict";
 /* ---------- constants ---------- */
 var PADL = 46, PADR = 12, HOURS = 240;
-/* chart sizes are user-resizable via corner grips; these defaults are also the minimums */
-var DEFSIZE = { width: 1080, temp: 150, wind: 140, cloud: 140, accum: 72 };
+/* chart heights are user-resizable via corner grips; these defaults are also the minimums.
+   Width is automatic: charts fill the browser (1080 floor scrolls sideways on small screens). */
+var DEFSIZE = { temp: 150, wind: 140, cloud: 140, accum: 72 };
 var sizes = load("bw_sizes") || {};
 Object.keys(DEFSIZE).forEach(function (k) { if (!(sizes[k] >= DEFSIZE[k])) sizes[k] = DEFSIZE[k]; });
+delete sizes.width;                          /* leftover from the pre-auto-width version */
 var W, PLOTW, SEC, BOTTOM, SVGH;
 function applyLayout() {
-  W = Math.min(sizes.width, 2600);
+  var scr = document.querySelector(".scroller");
+  W = Math.max(1080, scr ? scr.clientWidth : 0);
   PLOTW = W - PADL - PADR;
   var GAP = 58, y;                           /* gap holds each chart's legend row */
   SEC = { days: { y: 0, h: 110 }, temp: { y: 110, h: sizes.temp } };  /* temp flush against the day strip */
@@ -411,7 +414,13 @@ function render() {
     data.fetched.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) +
     ' <button title="Refresh" onclick="loadForecast()">⟳ refresh</button>';
   renderRecents();
+  /* rendering can add/remove the page scrollbar, changing the available width; refit once */
+  var scr = document.querySelector(".scroller");
+  if (scr && Math.max(1080, scr.clientWidth) !== W && !inRefit) {
+    inRefit = true; render(); inRefit = false;
+  }
 }
+var inRefit = false;
 
 function hrrrLegend() { return showHrrr && data.hrrr.any ? [[COL.hrrr, "HRRR", true]] : []; }
 
@@ -473,7 +482,7 @@ function bindPointer() {
     if (!h) { move(ev); return; }
     ev.preventDefault();
     var k = h.getAttribute("data-sec");
-    resizing = { sec: k, x0: ev.clientX, y0: ev.clientY, h0: sizes[k], w0: sizes.width };
+    resizing = { sec: k, y0: ev.clientY, h0: sizes[k] };
     hide();
   });
   svg.addEventListener("dblclick", function (ev) {  /* double-click a grip: back to defaults */
@@ -490,7 +499,9 @@ var resizing = null, resizeRaf = 0;
 window.addEventListener("pointermove", function (ev) {
   if (!resizing) return;
   sizes[resizing.sec] = Math.round(Math.max(DEFSIZE[resizing.sec], resizing.h0 + (ev.clientY - resizing.y0)));
-  sizes.width = Math.round(Math.min(2600, Math.max(DEFSIZE.width, resizing.w0 + (ev.clientX - resizing.x0))));
+  if (!resizeRaf) resizeRaf = requestAnimationFrame(function () { resizeRaf = 0; render(); });
+});
+window.addEventListener("resize", function () {  /* browser resized: refit chart width */
   if (!resizeRaf) resizeRaf = requestAnimationFrame(function () { resizeRaf = 0; render(); });
 });
 window.addEventListener("pointerup", function () {
