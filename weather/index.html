@@ -96,7 +96,9 @@ delete sizes.width;                          /* leftover from the pre-auto-width
 var W, PLOTW, SEC, BOTTOM, SVGH;
 function applyLayout() {
   var scr = document.querySelector(".scroller");
-  W = Math.max(1080, scr ? scr.clientWidth : 0);
+  /* -2px slack: at fractional display scaling (e.g. Windows 125%) an exact-width chart can
+     leave a sub-pixel overflow that renders a useless scrollbar */
+  W = Math.max(1080, (scr ? scr.clientWidth : 0) - 2);
   PLOTW = W - PADL - PADR;
   var GAP = 58, y;                           /* gap holds each chart's legend row */
   SEC = { days: { y: 0, h: 110 }, temp: { y: 110, h: sizes.temp } };  /* temp flush against the day strip */
@@ -416,7 +418,7 @@ function render() {
   renderRecents();
   /* rendering can add/remove the page scrollbar, changing the available width; refit once */
   var scr = document.querySelector(".scroller");
-  if (scr && Math.max(1080, scr.clientWidth) !== W && !inRefit) {
+  if (scr && Math.max(1080, scr.clientWidth - 2) !== W && !inRefit) {
     inRefit = true; render(); inRefit = false;
   }
 }
