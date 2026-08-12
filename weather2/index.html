@@ -46,6 +46,13 @@
 
   .scroller { overflow-x: auto; }
   .chartbox { position: relative; width: 1080px; }
+  .chartbox.loading { min-height: 340px; }
+  #loading { position: absolute; inset: 0; z-index: 25; display: none; align-items: center; justify-content: center;
+             background: rgba(255,255,255,.55); }
+  .chartbox.loading #loading { display: flex; }
+  .spin { width: 52px; height: 52px; border: 5px solid #cfe0f0; border-top-color: #1976d2; border-radius: 50%;
+          animation: bwspin .9s linear infinite; }
+  @keyframes bwspin { to { transform: rotate(360deg); } }
   svg text { font-family: inherit; }
   #tip { position: absolute; display: none; z-index: 20; background: rgba(255,255,255,.97); border: 1px solid #b9c2cb;
          border-radius: 8px; box-shadow: 0 3px 10px rgba(0,0,0,.15); padding: 11px 15px; font-size: 19px; line-height: 1.5;
@@ -74,6 +81,7 @@
     <div id="status"></div>
     <div class="scroller">
       <div class="chartbox" id="chartbox">
+        <div id="loading"><div class="spin"></div></div>
         <div id="tip"></div>
         <div id="chart"></div>
       </div>
@@ -105,7 +113,8 @@ function applyLayout() {
 applyLayout();
 var COL = {
   hi: "#cf3049", lo: "#3f74ad", band: "#f5f7f9", monthline: "#dcdfe3", grid: "#e8eaed",
-  range: "#f7e6e9", precipFill: "#9bd7ea", precipLine: "#3fa7c9", mavg: "#22729c"
+  range: "#f7e6e9", precipFill: "#9bd7ea", precipLine: "#3fa7c9", mavg: "#22729c",
+  rhi: "#e2a4b0", rlo: "#a5c3e0", rband: "#eef1f6"
 };
 var DEFAULT_LOC = { name: "Kirkland", admin1: "Washington", cc: "US", lat: 47.68, lon: -122.19, elev: 47 };
 
@@ -118,6 +127,7 @@ var fetchToken = 0;
 function load(k) { try { var v = localStorage.getItem(k); return v === null ? null : JSON.parse(v); } catch (e) { return null; } }
 function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 function $(id) { return document.getElementById(id); }
+function setLoading(on) { $("chartbox").className = "chartbox" + (on ? " loading" : ""); }
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 
 /* ---------- helpers ---------- */
@@ -142,15 +152,25 @@ var MD_IDX = (function () {
 })();
 
 /* ---------- data ---------- */
-function cacheKey(l) { return "bw2norm:" + l.lat.toFixed(2) + "," + l.lon.toFixed(2); }
+function cacheKey(l) { return "bw2norm2:" + l.lat.toFixed(2) + "," + l.lon.toFixed(2); }
+/* drop caches from the pre-extremes schema */
+(function () {
+  try {
+    for (var i = localStorage.length - 1; i >= 0; i--) {
+      var k = localStorage.key(i);
+      if (k && k.indexOf("bw2norm:") === 0) localStorage.removeItem(k);
+    }
+    localStorage.removeItem("bw2norm_keys");
+  } catch (e) {}
+})();
 function readCache(l) { return load(cacheKey(l)); }
 function writeCache(l, obj) {
-  var keys = load("bw2norm_keys") || [];
+  var keys = load("bw2norm2_keys") || [];
   var k = cacheKey(l);
   keys = keys.filter(function (e) { return e !== k; });
   keys.push(k);
   while (keys.length > 6) { try { localStorage.removeItem(keys.shift()); } catch (e) {} }
-  save("bw2norm_keys", keys);
+  save("bw2norm2_keys", keys);
   save(k, obj);
 }
 
@@ -159,8 +179,10 @@ function setStatus(html) { $("status").innerHTML = html; }
 function loadAverages(force) {
   var tok = ++fetchToken;
   var cached = force ? null : readCache(loc);
+  if (cached && !cached.rh) cached = null;             /* pre-extremes cache: refetch */
   if (cached) { data = cached; render(); setStatus(""); return; }
   setStatus("Crunching 10 years of daily history for " + esc(locLabel(loc, true)) + "… (a few seconds)");
+  setLoading(true);
   var url = "https://archive-api.open-meteo.com/v1/archive?latitude=" + loc.lat + "&longitude=" + loc.lon +
     "&start_date=" + YEAR_START + "&end_date=" + YEAR_END +
     "&daily=temperature_2m_max,temperature_2m_min,precipitation_sum" +
@@ -171,30 +193,34 @@ function loadAverages(force) {
   }).then(function (r) {
     if (tok !== fetchToken) return;
     var t = r.daily.time, tx = r.daily.temperature_2m_max, tn = r.daily.temperature_2m_min, ps = r.daily.precipitation_sum;
-    var hs = [], hc = [], ls = [], lc = [], pp = [], pc = [], i, idx;
-    for (i = 0; i < DAYS; i++) { hs.push(0); hc.push(0); ls.push(0); lc.push(0); pp.push(0); pc.push(0); }
+    var hs = [], hc = [], ls = [], lc = [], pp = [], pc = [], hx = [], ln = [], i, idx;
+    for (i = 0; i < DAYS; i++) { hs.push(0); hc.push(0); ls.push(0); lc.push(0); pp.push(0); pc.push(0); hx.push(-1e9); ln.push(1e9); }
     for (i = 0; i < t.length; i++) {
       idx = MD_IDX[t[i].slice(5)];
       if (idx === undefined) continue;                 /* Feb 29 */
-      if (tx[i] !== null) { hs[idx] += tx[i]; hc[idx]++; }
-      if (tn[i] !== null) { ls[idx] += tn[i]; lc[idx]++; }
+      if (tx[i] !== null) { hs[idx] += tx[i]; hc[idx]++; if (tx[i] > hx[idx]) hx[idx] = tx[i]; }
+      if (tn[i] !== null) { ls[idx] += tn[i]; lc[idx]++; if (tn[i] < ln[idx]) ln[idx] = tn[i]; }
       if (ps[i] !== null) { pp[idx] += ps[i]; pc[idx]++; }
     }
-    var hi = [], lo = [], p = [], mtot = [0,0,0,0,0,0,0,0,0,0,0,0], md;
+    var hi = [], lo = [], p = [], rh = [], rl = [], mtot = [0,0,0,0,0,0,0,0,0,0,0,0], md;
     for (i = 0; i < DAYS; i++) {
       hi.push(hc[i] ? Math.round(hs[i] / hc[i] * 10) / 10 : null);
       lo.push(lc[i] ? Math.round(ls[i] / lc[i] * 10) / 10 : null);
+      rh.push(hc[i] ? Math.round(hx[i] * 10) / 10 : null);
+      rl.push(lc[i] ? Math.round(ln[i] * 10) / 10 : null);
       p.push(pc[i] ? Math.round(pp[i] / pc[i] * 1000) / 1000 : null);
       md = doyToMD(i);
       if (p[i] !== null) mtot[md[0]] += p[i];
     }
-    data = { hi: hi, lo: lo, p: p, mtot: mtot, fetched: Date.now() };
+    data = { hi: hi, lo: lo, rh: rh, rl: rl, p: p, mtot: mtot, fetched: Date.now() };
     writeCache(loc, data);
     render();
     setStatus("");
+    setLoading(false);
   }).catch(function (e) {
     if (tok !== fetchToken) return;
     setStatus('<span class="err">Could not load history (' + esc(e.message) + ').</span> <button onclick="loadAverages(true)">retry</button>');
+    setLoading(false);
   });
 }
 
@@ -236,15 +262,26 @@ function render() {
   });
 
   /* ---- temperature ---- */
-  var tmin = 1e9, tmax = -1e9;
+  var tmin = 1e9, tmax = -1e9, hiSrc = data.rh || data.hi, loSrc = data.rl || data.lo;
   for (i = 0; i < DAYS; i++) {
-    if (data.hi[i] !== null && data.hi[i] > tmax) tmax = data.hi[i];
-    if (data.lo[i] !== null && data.lo[i] < tmin) tmin = data.lo[i];
+    if (hiSrc[i] !== null && hiSrc[i] > tmax) tmax = hiSrc[i];
+    if (loSrc[i] !== null && loSrc[i] < tmin) tmin = loSrc[i];
   }
   var tstep = (tmax - tmin > 55) ? 20 : 10;
   var tlo = Math.floor((tmin - 3) / tstep) * tstep, thi = Math.ceil((tmax + 3) / tstep) * tstep;
   var yT = function (v) { return SEC.temp.y + SEC.temp.h * (1 - (v - tlo) / (thi - tlo)); };
   grid(s, SEC.temp, tlo, thi, tstep, function (v) { return v + " F"; });
+  /* outer band: the highest / lowest reading on each date across the 10 years */
+  if (data.rh && data.rl) {
+    var ru = [], rd = [];
+    for (i = 0; i < DAYS; i++) if (data.rh[i] !== null && data.rl[i] !== null) {
+      ru.push((ru.length ? "L" : "M") + x(i).toFixed(1) + " " + yT(data.rh[i]).toFixed(1));
+    }
+    for (i = DAYS - 1; i >= 0; i--) if (data.rh[i] !== null && data.rl[i] !== null) {
+      rd.push("L" + x(i).toFixed(1) + " " + yT(data.rl[i]).toFixed(1));
+    }
+    if (ru.length) s.push('<path d="' + ru.join("") + rd.join("") + 'Z" fill="#e7ecf3" fill-opacity="0.7"/>');
+  }
   /* shaded band between avg high and avg low */
   var up = [], dn = [];
   for (i = 0; i < DAYS; i++) if (data.hi[i] !== null && data.lo[i] !== null) {
@@ -256,7 +293,9 @@ function render() {
   if (up.length) s.push('<path d="' + up.join("") + dn.join("") + 'Z" fill="' + COL.range + '"/>');
   s.push('<path d="' + linePath(data.hi, yT) + '" fill="none" stroke="' + COL.hi + '" stroke-width="1.8"/>');
   s.push('<path d="' + linePath(data.lo, yT) + '" fill="none" stroke="' + COL.lo + '" stroke-width="1.8"/>');
-  legend(s, SEC.temp, [[COL.hi, "Average High (°F)"], [COL.lo, "Average Low (°F)"]]);
+  if (data.rh) s.push('<path d="' + linePath(data.rh, yT) + '" fill="none" stroke="' + COL.rhi + '" stroke-width="1.2"/>');
+  if (data.rl) s.push('<path d="' + linePath(data.rl, yT) + '" fill="none" stroke="' + COL.rlo + '" stroke-width="1.2"/>');
+  legend(s, SEC.temp, [[COL.hi, "Average High (°F)"], [COL.lo, "Average Low (°F)"], [COL.rhi, "Highest (10 yrs)"], [COL.rlo, "Lowest (10 yrs)"]]);
 
   /* ---- precipitation ---- */
   var pmax = 0;
@@ -343,6 +382,8 @@ function bindPointer() {
     var html = '<div class="t">' + mn + " " + md[1] + " · avg of " + YEARS_LABEL + "</div>" +
       "🌡️ high " + (data.hi[d] === null ? "–" : Math.round(data.hi[d]) + "°F") +
       " · low " + (data.lo[d] === null ? "–" : Math.round(data.lo[d]) + "°F") + "<br>" +
+      (data.rh && data.rh[d] !== null && data.rl && data.rl[d] !== null ?
+        "▲ " + Math.round(data.rh[d]) + "° highest · ▼ " + Math.round(data.rl[d]) + "° lowest<br>" : "") +
       "💧 " + (data.p[d] === null ? "–" : fmtIn(data.p[d]) + " in this day") +
       " · " + mn + " total " + fmtIn(data.mtot[md[0]], 1) + " in";
     tip.innerHTML = html;

@@ -47,6 +47,13 @@
 
   .scroller { overflow-x: auto; }
   .chartbox { position: relative; width: 1080px; }
+  .chartbox.loading { min-height: 340px; }
+  #loading { position: absolute; inset: 0; z-index: 25; display: none; align-items: center; justify-content: center;
+             background: rgba(255,255,255,.55); }
+  .chartbox.loading #loading { display: flex; }
+  .spin { width: 52px; height: 52px; border: 5px solid #cfe0f0; border-top-color: #1976d2; border-radius: 50%;
+          animation: bwspin .9s linear infinite; }
+  @keyframes bwspin { to { transform: rotate(360deg); } }
   svg text { font-family: inherit; }
   #tip { position: absolute; display: none; z-index: 20; background: rgba(255,255,255,.97); border: 1px solid #b9c2cb;
          border-radius: 8px; box-shadow: 0 3px 10px rgba(0,0,0,.15); padding: 11px 15px; font-size: 19px; line-height: 1.5;
@@ -79,6 +86,7 @@
     <div id="status"></div>
     <div class="scroller">
       <div class="chartbox" id="chartbox">
+        <div id="loading"><div class="spin"></div></div>
         <div id="tip"></div>
         <div id="chart"></div>
       </div>
@@ -135,6 +143,7 @@ var fetchToken = 0;
 function load(k) { try { var v = localStorage.getItem(k); return v === null ? null : JSON.parse(v); } catch (e) { return null; } }
 function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 function $(id) { return document.getElementById(id); }
+function setLoading(on) { $("chartbox").className = "chartbox" + (on ? " loading" : ""); }
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 
 /* ---------- helpers ---------- */
@@ -228,6 +237,7 @@ function api(params) {
 function loadForecast() {
   var token = ++fetchToken;
   $("status").textContent = "Loading forecast for " + locLabel(loc) + "…";
+  setLoading(true);
   Promise.all([
     api({ models: "ecmwf_ifs025", forecast_days: 10,
           hourly: "temperature_2m,apparent_temperature,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m" }),
@@ -240,10 +250,12 @@ function loadForecast() {
     build(res[0], res[1], res[2]);
     $("status").textContent = "";
     render();
+    setLoading(false);
   }).catch(function (e) {
     if (token !== fetchToken) return;
     $("status").innerHTML = '<span class="err">Could not load the forecast (' + esc(e.message) +
       ').</span><button onclick="loadForecast()">Try again</button>';
+    setLoading(false);
   });
 }
 
