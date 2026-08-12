@@ -152,25 +152,24 @@ var MD_IDX = (function () {
 })();
 
 /* ---------- data ---------- */
-function cacheKey(l) { return "bw2norm2:" + l.lat.toFixed(2) + "," + l.lon.toFixed(2); }
-/* drop caches from the pre-extremes schema */
+function cacheKey(l) { return "bw2norm3:" + l.lat.toFixed(2) + "," + l.lon.toFixed(2); }
+/* drop caches from older schemas (anything bw2norm* that isn't the current v3) */
 (function () {
   try {
     for (var i = localStorage.length - 1; i >= 0; i--) {
       var k = localStorage.key(i);
-      if (k && k.indexOf("bw2norm:") === 0) localStorage.removeItem(k);
+      if (k && k.indexOf("bw2norm") === 0 && k.indexOf("bw2norm3") !== 0) localStorage.removeItem(k);
     }
-    localStorage.removeItem("bw2norm_keys");
   } catch (e) {}
 })();
 function readCache(l) { return load(cacheKey(l)); }
 function writeCache(l, obj) {
-  var keys = load("bw2norm2_keys") || [];
+  var keys = load("bw2norm3_keys") || [];
   var k = cacheKey(l);
   keys = keys.filter(function (e) { return e !== k; });
   keys.push(k);
   while (keys.length > 6) { try { localStorage.removeItem(keys.shift()); } catch (e) {} }
-  save("bw2norm2_keys", keys);
+  save("bw2norm3_keys", keys);
   save(k, obj);
 }
 
@@ -179,7 +178,7 @@ function setStatus(html) { $("status").innerHTML = html; }
 function loadAverages(force) {
   var tok = ++fetchToken;
   var cached = force ? null : readCache(loc);
-  if (cached && !cached.rh) cached = null;             /* pre-extremes cache: refetch */
+  if (cached && !(cached.rh && cached.rhy)) cached = null;   /* older-schema cache: refetch */
   if (cached) { data = cached; render(); setStatus(""); return; }
   setStatus("Crunching 10 years of daily history for " + esc(locLabel(loc, true)) + "… (a few seconds)");
   setLoading(true);
@@ -193,26 +192,29 @@ function loadAverages(force) {
   }).then(function (r) {
     if (tok !== fetchToken) return;
     var t = r.daily.time, tx = r.daily.temperature_2m_max, tn = r.daily.temperature_2m_min, ps = r.daily.precipitation_sum;
-    var hs = [], hc = [], ls = [], lc = [], pp = [], pc = [], hx = [], ln = [], i, idx;
-    for (i = 0; i < DAYS; i++) { hs.push(0); hc.push(0); ls.push(0); lc.push(0); pp.push(0); pc.push(0); hx.push(-1e9); ln.push(1e9); }
+    var hs = [], hc = [], ls = [], lc = [], pp = [], pc = [], hx = [], ln = [], hxy = [], lny = [], i, idx, yr;
+    for (i = 0; i < DAYS; i++) { hs.push(0); hc.push(0); ls.push(0); lc.push(0); pp.push(0); pc.push(0); hx.push(-1e9); ln.push(1e9); hxy.push(null); lny.push(null); }
     for (i = 0; i < t.length; i++) {
       idx = MD_IDX[t[i].slice(5)];
       if (idx === undefined) continue;                 /* Feb 29 */
-      if (tx[i] !== null) { hs[idx] += tx[i]; hc[idx]++; if (tx[i] > hx[idx]) hx[idx] = tx[i]; }
-      if (tn[i] !== null) { ls[idx] += tn[i]; lc[idx]++; if (tn[i] < ln[idx]) ln[idx] = tn[i]; }
+      yr = +t[i].slice(0, 4);
+      if (tx[i] !== null) { hs[idx] += tx[i]; hc[idx]++; if (tx[i] > hx[idx]) { hx[idx] = tx[i]; hxy[idx] = yr; } }
+      if (tn[i] !== null) { ls[idx] += tn[i]; lc[idx]++; if (tn[i] < ln[idx]) { ln[idx] = tn[i]; lny[idx] = yr; } }
       if (ps[i] !== null) { pp[idx] += ps[i]; pc[idx]++; }
     }
-    var hi = [], lo = [], p = [], rh = [], rl = [], mtot = [0,0,0,0,0,0,0,0,0,0,0,0], md;
+    var hi = [], lo = [], p = [], rh = [], rl = [], rhy = [], rly = [], mtot = [0,0,0,0,0,0,0,0,0,0,0,0], md;
     for (i = 0; i < DAYS; i++) {
       hi.push(hc[i] ? Math.round(hs[i] / hc[i] * 10) / 10 : null);
       lo.push(lc[i] ? Math.round(ls[i] / lc[i] * 10) / 10 : null);
       rh.push(hc[i] ? Math.round(hx[i] * 10) / 10 : null);
       rl.push(lc[i] ? Math.round(ln[i] * 10) / 10 : null);
+      rhy.push(hc[i] ? hxy[i] : null);
+      rly.push(lc[i] ? lny[i] : null);
       p.push(pc[i] ? Math.round(pp[i] / pc[i] * 1000) / 1000 : null);
       md = doyToMD(i);
       if (p[i] !== null) mtot[md[0]] += p[i];
     }
-    data = { hi: hi, lo: lo, rh: rh, rl: rl, p: p, mtot: mtot, fetched: Date.now() };
+    data = { hi: hi, lo: lo, rh: rh, rl: rl, rhy: rhy, rly: rly, p: p, mtot: mtot, fetched: Date.now() };
     writeCache(loc, data);
     render();
     setStatus("");
@@ -383,7 +385,8 @@ function bindPointer() {
       "🌡️ high " + (data.hi[d] === null ? "–" : Math.round(data.hi[d]) + "°F") +
       " · low " + (data.lo[d] === null ? "–" : Math.round(data.lo[d]) + "°F") + "<br>" +
       (data.rh && data.rh[d] !== null && data.rl && data.rl[d] !== null ?
-        "▲ " + Math.round(data.rh[d]) + "° highest · ▼ " + Math.round(data.rl[d]) + "° lowest<br>" : "") +
+        "▲ " + Math.round(data.rh[d]) + "° highest" + (data.rhy && data.rhy[d] ? " (" + data.rhy[d] + ")" : "") +
+        " · ▼ " + Math.round(data.rl[d]) + "° lowest" + (data.rly && data.rly[d] ? " (" + data.rly[d] + ")" : "") + "<br>" : "") +
       "💧 " + (data.p[d] === null ? "–" : fmtIn(data.p[d]) + " in this day") +
       " · " + mn + " total " + fmtIn(data.mtot[md[0]], 1) + " in";
     tip.innerHTML = html;
