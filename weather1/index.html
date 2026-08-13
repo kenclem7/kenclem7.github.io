@@ -14,7 +14,9 @@
 
   header { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: flex-start; margin-bottom: 6px; }
   .titleblock { flex: 1 1 340px; min-width: 260px; }
-  #nowbox { flex: 0 1 auto; display: none; align-items: center; gap: 12px; margin: 2px auto 0; }
+  #nowbox { flex: 1 1 auto; display: none; align-items: center; justify-content: center; margin: 0 8px; }
+  .nowcard { display: flex; align-items: center; gap: 12px; border: 1px solid #d7dde3; border-radius: 10px;
+             padding: 8px 16px; background: #f8fafc; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
   #nowbox .nicon { font-size: 40px; line-height: 1; }
   #nowbox .ntemp { font-size: 36px; font-weight: 600; }
   #nowbox .ncond { font-size: 14.5px; color: #444; font-weight: 600; }
@@ -341,10 +343,10 @@ function renderNow() {
   var n = data.now, box = $("nowbox");
   if (!n || n.temperature_2m === null || n.temperature_2m === undefined) { box.style.display = "none"; return; }
   var ic = codeIcon(n.weather_code || 0, n.cloud_cover === null ? 50 : n.cloud_cover, n.is_day !== 0);
-  box.innerHTML = '<div class="nicon">' + ic[0] + '</div><div class="ntemp">' + Math.round(n.temperature_2m) + "°</div>" +
+  box.innerHTML = '<div class="nowcard"><div class="nicon">' + ic[0] + '</div><div class="ntemp">' + Math.round(n.temperature_2m) + "°</div>" +
     '<div><div class="ncond">' + ic[1] + "</div>" +
     '<div class="nsub">feels ' + Math.round(n.apparent_temperature) + "° · " + compass(n.wind_direction_10m) + " " +
-    Math.round(n.wind_speed_10m) + " mph · gusts " + Math.round(n.wind_gusts_10m) + "</div></div>";
+    Math.round(n.wind_speed_10m) + " mph · gusts " + Math.round(n.wind_gusts_10m) + "</div></div></div>";
   box.style.display = "flex";
 }
 
