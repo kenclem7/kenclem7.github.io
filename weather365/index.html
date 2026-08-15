@@ -120,7 +120,7 @@ var DEFAULT_LOC = { name: "Kirkland", admin1: "Washington", cc: "US", lat: 47.68
 
 /* ---------- state ---------- */
 var loc = load("bw2_current") || DEFAULT_LOC;
-var recents = load("bw_recents") || [DEFAULT_LOC];   /* shared with the 10-day page */
+var recents = load("bw_recents") || [DEFAULT_LOC];   /* shared with the forecast pages */
 var data = null;                                     /* {hi[365], lo[365], p[365], mtot[12], fetched} */
 var fetchToken = 0;
 
@@ -315,7 +315,7 @@ function render() {
   }
   if (started) s.push('<path d="' + pa.join("") + "L" + xb(DAYS).toFixed(1) + " " + yP(0).toFixed(1) + 'Z" fill="' + COL.precipFill + '" fill-opacity="0.75"/>');
   s.push('<path d="' + linePath(data.p, yP) + '" fill="none" stroke="' + COL.precipLine + '" stroke-width="1.2"/>');
-  /* weekly average overlay, smoothed: 7-day circular mean, then a triangular kernel pass */
+  /* weekly average overlay, smoothed: 7 day circular mean, then a triangular kernel pass */
   var wk = [], sm = [], j, acc, cnt, vv, wgt, vsum, wsum;
   for (i = 0; i < DAYS; i++) {
     acc = 0; cnt = 0;
@@ -407,7 +407,7 @@ window.addEventListener("resize", function () {
   if (!resizeRaf) resizeRaf = requestAnimationFrame(function () { resizeRaf = 0; render(); });
 });
 
-/* ---------- location search + recents (same behavior as the 10-day page) ---------- */
+/* ---------- location search + recents (same behavior as the forecast pages) ---------- */
 function renderRecents() {
   var host = $("recents"); host.innerHTML = "";
   recents.forEach(function (r, idx) {

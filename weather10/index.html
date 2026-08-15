@@ -79,7 +79,7 @@
   <div class="card">
     <header>
       <div class="titleblock">
-        <h1 id="title">10-Day Weather Forecast</h1>
+        <h1 id="title">10 Day Weather Forecast</h1>
         <div id="locmeta"></div>
       </div>
       <div id="nowbox"></div>
@@ -99,7 +99,7 @@
         <div id="chart"></div>
       </div>
     </div>
-    <div class="foot">Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> · forecast: ECMWF 10-day model · orange dashes: NOAA HRRR (short-range) · precip chance from ensemble blend · updates hourly on the half hour</div>
+    <div class="foot">Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> · forecast: ECMWF model · orange dashes: NOAA HRRR (short-range) · precip chance from ensemble blend · updates hourly on the half hour</div>
   </div>
 </div>
 
@@ -492,7 +492,7 @@ function render() {
   $("chart").innerHTML = s.join("");
 
   bindPointer();
-  $("title").textContent = locLabel(loc) + " 10-Day Weather Forecast";
+  $("title").textContent = locLabel(loc) + " 10 Day Weather Forecast";
   document.title = locLabel(loc, true) + " · Boat Weather";
   renderNow();
   var latN = Math.abs(loc.lat).toFixed(2) + "°" + (loc.lat >= 0 ? "N" : "S");
