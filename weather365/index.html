@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Average Year · Boat Weather</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌡️</text></svg>">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif; background: #eef1f4; color: #222; }
+  .page { margin: 0 auto; padding: 14px 20px 30px; }
+  .card { background: #fff; border: 1px solid #dde2e8; border-radius: 8px; padding: 16px 16px 8px; }
+
+  header { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: flex-start; margin-bottom: 6px; }
+  .titleblock { flex: 1 1 340px; min-width: 260px; }
+  h1 { font-size: 22px; font-weight: 600; letter-spacing: .2px; }
+  #locmeta { font-size: 12px; color: #777; margin-top: 3px; }
+  #locmeta button { border: none; background: none; color: #1976d2; cursor: pointer; font-size: 13px; padding: 0 2px; }
+  #locmeta a { color: #1976d2; text-decoration: none; }
+  #locmeta a:hover { text-decoration: underline; }
+
+  .searchwrap { position: relative; flex: 0 1 300px; min-width: 230px; }
+  #q { width: 100%; padding: 8px 10px; font-size: 14px; border: 1px solid #c5ccd4; border-radius: 6px; outline: none; }
+  #q:focus { border-color: #1976d2; }
+  .pagelink { display: flex; justify-content: space-between; font-size: 16.5px; font-weight: 500; margin-top: 6px; }
+  .pagelink a { color: #1976d2; text-decoration: none; }
+  .pagelink a:hover { text-decoration: underline; }
+  #results { position: absolute; top: 100%; left: 0; right: 0; z-index: 30; background: #fff; border: 1px solid #c5ccd4;
+             border-radius: 0 0 6px 6px; box-shadow: 0 6px 16px rgba(0,0,0,.12); max-height: 240px; overflow-y: auto; }
+  #results div { padding: 8px 10px; font-size: 13px; cursor: pointer; }
+  #results div:hover, #results div.sel { background: #eaf3fc; }
+  #results .none { color: #999; cursor: default; }
+
+  #recents { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; background: #f1f3f6; border: 1px solid #d7dde3;
+          border-radius: 14px; padding: 4px 8px 4px 11px; cursor: pointer; user-select: none; }
+  .chip.active { background: #e3f0fb; border-color: #90bfe8; color: #0d5ba1; font-weight: 600; }
+  .chip b { font-weight: inherit; }
+  .chip span { color: #98a2ad; font-size: 13px; line-height: 1; padding: 1px 3px; border-radius: 8px; }
+  .chip span:hover { background: #d9dee4; color: #555; }
+
+  #status { font-size: 13px; color: #888; padding: 8px 2px; min-height: 20px; }
+  #status .err { color: #c0392b; }
+  #status button { margin-left: 8px; font-size: 12.5px; cursor: pointer; }
+
+  .scroller { overflow-x: auto; }
+  .chartbox { position: relative; width: 1080px; }
+  .chartbox.loading { min-height: 340px; }
+  #loading { position: absolute; inset: 0; z-index: 25; display: none; align-items: center; justify-content: center;
+             background: rgba(255,255,255,.55); }
+  .chartbox.loading #loading { display: flex; }
+  .spin { width: 52px; height: 52px; border: 5px solid #cfe0f0; border-top-color: #1976d2; border-radius: 50%;
+          animation: bwspin .9s linear infinite; }
+  @keyframes bwspin { to { transform: rotate(360deg); } }
+  svg text { font-family: inherit; }
+  #tip { position: absolute; display: none; z-index: 20; background: rgba(255,255,255,.97); border: 1px solid #b9c2cb;
+         border-radius: 8px; box-shadow: 0 3px 10px rgba(0,0,0,.15); padding: 11px 15px; font-size: 19px; line-height: 1.5;
+         pointer-events: none; white-space: nowrap; }
+  #tip .t { font-weight: 600; }
+  .foot { font-size: 11.5px; color: #98a2ad; padding: 10px 2px 6px; }
+  .foot a { color: #1976d2; text-decoration: none; }
+  .foot a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="card">
+    <header>
+      <div class="titleblock">
+        <h1 id="title">Average Year</h1>
+        <div id="locmeta"></div>
+      </div>
+      <div class="searchwrap">
+        <input id="q" type="text" placeholder="Add location (city or town)…" autocomplete="off" spellcheck="false">
+        <div id="results" style="display:none"></div>
+        <div class="pagelink"><a href="/weather3/">3-day</a><a href="/weather10/">10 Day Forecast</a></div>
+      </div>
+      <div id="recents"></div>
+    </header>
+    <div id="status"></div>
+    <div class="scroller">
+      <div class="chartbox" id="chartbox">
+        <div id="loading"><div class="spin"></div></div>
+        <div id="tip"></div>
+        <div id="chart"></div>
+      </div>
+    </div>
+    <div class="foot">Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> · ERA5 historical reanalysis · daily averages over the last 10 full years (2016-2025), Feb 29 excluded</div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ---------- constants ---------- */
+var PADL = 46, PADR = 12, DAYS = 365;
+var YEAR_START = "2016-01-01", YEAR_END = "2025-12-31", YEARS_LABEL = "2016-2025";
+var MDAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+var MNAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+var MSTART = (function () { var a = [0], i; for (i = 0; i < 12; i++) a.push(a[i] + MDAYS[i]); return a; })();
+var W, PLOTW, SEC, BOTTOM, SVGH;
+function applyLayout() {
+  var scr = document.querySelector(".scroller");
+  /* -2px slack: at fractional display scaling an exact-width chart can leave a sub-pixel
+     overflow that renders a useless scrollbar */
+  W = Math.max(900, (scr ? scr.clientWidth : 0) - 2);
+  PLOTW = W - PADL - PADR;
+  SEC = { temp: { y: 8, h: 280 } };
+  SEC.precip = { y: SEC.temp.y + SEC.temp.h + 66, h: 200 };
+  BOTTOM = SEC.precip.y + SEC.precip.h;
+  SVGH = BOTTOM + 44;
+}
+applyLayout();
+var COL = {
+  hi: "#cf3049", lo: "#3f74ad", band: "#f5f7f9", monthline: "#dcdfe3", grid: "#e8eaed",
+  range: "#f7e6e9", precipFill: "#9bd7ea", precipLine: "#3fa7c9", mavg: "#22729c",
+  rhi: "#e2a4b0", rlo: "#a5c3e0", rband: "#eef1f6"
+};
+var DEFAULT_LOC = { name: "Kirkland", admin1: "Washington", cc: "US", lat: 47.68, lon: -122.19, elev: 47 };
+
+/* ---------- state ---------- */
+var loc = load("bw2_current") || DEFAULT_LOC;
+var recents = load("bw_recents") || [DEFAULT_LOC];   /* shared with the 10-day page */
+var data = null;                                     /* {hi[365], lo[365], p[365], mtot[12], fetched} */
+var fetchToken = 0;
+
+function load(k) { try { var v = localStorage.getItem(k); return v === null ? null : JSON.parse(v); } catch (e) { return null; } }
+function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+function $(id) { return document.getElementById(id); }
+function setLoading(on) { $("chartbox").className = "chartbox" + (on ? " loading" : ""); }
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+
+/* ---------- helpers ---------- */
+function locLabel(l, short) {
+  var a = l.admin1 || "";
+  var s = l.name + (a && a !== l.name ? ", " + a : "");
+  if (l.cc && l.cc !== "US") s += " (" + l.cc + ")";
+  return short ? l.name : s;
+}
+function sameLoc(a, b) { return Math.abs(a.lat - b.lat) < 0.005 && Math.abs(a.lon - b.lon) < 0.005; }
+function x(d) { return PADL + (d + 0.5) / DAYS * PLOTW; }
+function xb(doy) { return PADL + doy / DAYS * PLOTW; }
+function doyToMD(d) { var m = 0; while (d >= MSTART[m + 1]) m++; return [m, d - MSTART[m] + 1]; }
+function fmtIn(v, dp) { return v.toFixed(dp === undefined ? 2 : dp); }
+
+/* month-day string "MM-DD" -> 0..364 (non-leap calendar) */
+var MD_IDX = (function () {
+  var map = {}, m, d;
+  for (m = 0; m < 12; m++) for (d = 1; d <= MDAYS[m]; d++)
+    map[(m < 9 ? "0" : "") + (m + 1) + "-" + (d < 10 ? "0" : "") + d] = MSTART[m] + d - 1;
+  return map;
+})();
+
+/* ---------- data ---------- */
+function cacheKey(l) { return "bw2norm3:" + l.lat.toFixed(2) + "," + l.lon.toFixed(2); }
+/* drop caches from older schemas (anything bw2norm* that isn't the current v3) */
+(function () {
+  try {
+    for (var i = localStorage.length - 1; i >= 0; i--) {
+      var k = localStorage.key(i);
+      if (k && k.indexOf("bw2norm") === 0 && k.indexOf("bw2norm3") !== 0) localStorage.removeItem(k);
+    }
+  } catch (e) {}
+})();
+function readCache(l) { return load(cacheKey(l)); }
+function writeCache(l, obj) {
+  var keys = load("bw2norm3_keys") || [];
+  var k = cacheKey(l);
+  keys = keys.filter(function (e) { return e !== k; });
+  keys.push(k);
+  while (keys.length > 6) { try { localStorage.removeItem(keys.shift()); } catch (e) {} }
+  save("bw2norm3_keys", keys);
+  save(k, obj);
+}
+
+function setStatus(html) { $("status").innerHTML = html; }
+
+function loadAverages(force) {
+  var tok = ++fetchToken;
+  var cached = force ? null : readCache(loc);
+  if (cached && !(cached.rh && cached.rhy)) cached = null;   /* older-schema cache: refetch */
+  if (cached) { data = cached; render(); setStatus(""); return; }
+  setStatus("Crunching 10 years of daily history for " + esc(locLabel(loc, true)) + "… (a few seconds)");
+  setLoading(true);
+  var url = "https://archive-api.open-meteo.com/v1/archive?latitude=" + loc.lat + "&longitude=" + loc.lon +
+    "&start_date=" + YEAR_START + "&end_date=" + YEAR_END +
+    "&daily=temperature_2m_max,temperature_2m_min,precipitation_sum" +
+    "&temperature_unit=fahrenheit&precipitation_unit=inch&timezone=auto";
+  fetch(url).then(function (r) {
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  }).then(function (r) {
+    if (tok !== fetchToken) return;
+    var t = r.daily.time, tx = r.daily.temperature_2m_max, tn = r.daily.temperature_2m_min, ps = r.daily.precipitation_sum;
+    var hs = [], hc = [], ls = [], lc = [], pp = [], pc = [], hx = [], ln = [], hxy = [], lny = [], i, idx, yr;
+    for (i = 0; i < DAYS; i++) { hs.push(0); hc.push(0); ls.push(0); lc.push(0); pp.push(0); pc.push(0); hx.push(-1e9); ln.push(1e9); hxy.push(null); lny.push(null); }
+    for (i = 0; i < t.length; i++) {
+      idx = MD_IDX[t[i].slice(5)];
+      if (idx === undefined) continue;                 /* Feb 29 */
+      yr = +t[i].slice(0, 4);
+      if (tx[i] !== null) { hs[idx] += tx[i]; hc[idx]++; if (tx[i] > hx[idx]) { hx[idx] = tx[i]; hxy[idx] = yr; } }
+      if (tn[i] !== null) { ls[idx] += tn[i]; lc[idx]++; if (tn[i] < ln[idx]) { ln[idx] = tn[i]; lny[idx] = yr; } }
+      if (ps[i] !== null) { pp[idx] += ps[i]; pc[idx]++; }
+    }
+    var hi = [], lo = [], p = [], rh = [], rl = [], rhy = [], rly = [], mtot = [0,0,0,0,0,0,0,0,0,0,0,0], md;
+    for (i = 0; i < DAYS; i++) {
+      hi.push(hc[i] ? Math.round(hs[i] / hc[i] * 10) / 10 : null);
+      lo.push(lc[i] ? Math.round(ls[i] / lc[i] * 10) / 10 : null);
+      rh.push(hc[i] ? Math.round(hx[i] * 10) / 10 : null);
+      rl.push(lc[i] ? Math.round(ln[i] * 10) / 10 : null);
+      rhy.push(hc[i] ? hxy[i] : null);
+      rly.push(lc[i] ? lny[i] : null);
+      p.push(pc[i] ? Math.round(pp[i] / pc[i] * 1000) / 1000 : null);
+      md = doyToMD(i);
+      if (p[i] !== null) mtot[md[0]] += p[i];
+    }
+    data = { hi: hi, lo: lo, rh: rh, rl: rl, rhy: rhy, rly: rly, p: p, mtot: mtot, fetched: Date.now() };
+    writeCache(loc, data);
+    render();
+    setStatus("");
+    setLoading(false);
+  }).catch(function (e) {
+    if (tok !== fetchToken) return;
+    setStatus('<span class="err">Could not load history (' + esc(e.message) + ').</span> <button onclick="loadAverages(true)">retry</button>');
+    setLoading(false);
+  });
+}
+
+/* ---------- axis helpers ---------- */
+function grid(s, sec, lo, hi, step, fmt) {
+  for (var v = lo; v <= hi + 1e-9; v += step) {
+    var y = sec.y + sec.h * (1 - (v - lo) / (hi - lo));
+    s.push('<line x1="' + PADL + '" y1="' + y.toFixed(1) + '" x2="' + (W - PADR) + '" y2="' + y.toFixed(1) + '" stroke="' + COL.grid + '" stroke-width="1"/>');
+    s.push('<text x="' + (PADL - 5) + '" y="' + (y + 3.5).toFixed(1) + '" text-anchor="end" font-size="10" fill="#8a939c">' + fmt(v) + "</text>");
+  }
+}
+function linePath(arr, yf) {
+  var out = [], pen = false, i;
+  for (i = 0; i < DAYS; i++) {
+    if (arr[i] === null) { pen = false; continue; }
+    out.push((pen ? "L" : "M") + x(i).toFixed(1) + " " + yf(arr[i]).toFixed(1));
+    pen = true;
+  }
+  return out.join("");
+}
+
+/* ---------- render ---------- */
+function render() {
+  if (!data) return;
+  applyLayout();
+  $("chartbox").style.width = W + "px";
+  var s = [], i, m;
+  s.push('<svg id="wx" width="' + W + '" height="' + SVGH + '" viewBox="0 0 ' + W + " " + SVGH + '">');
+
+  /* month bands + boundaries + labels, per section */
+  [SEC.temp, SEC.precip].forEach(function (sec) {
+    for (m = 0; m < 12; m++) {
+      if (m % 2 === 1) s.push('<rect x="' + xb(MSTART[m]).toFixed(1) + '" y="' + sec.y + '" width="' + (MDAYS[m] / DAYS * PLOTW).toFixed(1) + '" height="' + sec.h + '" fill="' + COL.band + '"/>');
+      s.push('<text x="' + ((xb(MSTART[m]) + xb(MSTART[m + 1])) / 2).toFixed(1) + '" y="' + (sec.y + sec.h + 15) + '" text-anchor="middle" font-size="11" fill="#667">' + MNAMES[m] + "</text>");
+    }
+    for (m = 0; m <= 12; m++) {
+      s.push('<line x1="' + xb(MSTART[m]).toFixed(1) + '" y1="' + sec.y + '" x2="' + xb(MSTART[m]).toFixed(1) + '" y2="' + (sec.y + sec.h) + '" stroke="' + COL.monthline + '" stroke-width="1"/>');
+    }
+  });
+
+  /* ---- temperature ---- */
+  var tmin = 1e9, tmax = -1e9, hiSrc = data.rh || data.hi, loSrc = data.rl || data.lo;
+  for (i = 0; i < DAYS; i++) {
+    if (hiSrc[i] !== null && hiSrc[i] > tmax) tmax = hiSrc[i];
+    if (loSrc[i] !== null && loSrc[i] < tmin) tmin = loSrc[i];
+  }
+  var tstep = (tmax - tmin > 55) ? 20 : 10;
+  var tlo = Math.floor((tmin - 3) / tstep) * tstep, thi = Math.ceil((tmax + 3) / tstep) * tstep;
+  var yT = function (v) { return SEC.temp.y + SEC.temp.h * (1 - (v - tlo) / (thi - tlo)); };
+  grid(s, SEC.temp, tlo, thi, tstep, function (v) { return v + " F"; });
+  /* outer band: the highest / lowest reading on each date across the 10 years */
+  if (data.rh && data.rl) {
+    var ru = [], rd = [];
+    for (i = 0; i < DAYS; i++) if (data.rh[i] !== null && data.rl[i] !== null) {
+      ru.push((ru.length ? "L" : "M") + x(i).toFixed(1) + " " + yT(data.rh[i]).toFixed(1));
+    }
+    for (i = DAYS - 1; i >= 0; i--) if (data.rh[i] !== null && data.rl[i] !== null) {
+      rd.push("L" + x(i).toFixed(1) + " " + yT(data.rl[i]).toFixed(1));
+    }
+    if (ru.length) s.push('<path d="' + ru.join("") + rd.join("") + 'Z" fill="#e7ecf3" fill-opacity="0.7"/>');
+  }
+  /* shaded band between avg high and avg low */
+  var up = [], dn = [];
+  for (i = 0; i < DAYS; i++) if (data.hi[i] !== null && data.lo[i] !== null) {
+    up.push((up.length ? "L" : "M") + x(i).toFixed(1) + " " + yT(data.hi[i]).toFixed(1));
+  }
+  for (i = DAYS - 1; i >= 0; i--) if (data.hi[i] !== null && data.lo[i] !== null) {
+    dn.push("L" + x(i).toFixed(1) + " " + yT(data.lo[i]).toFixed(1));
+  }
+  if (up.length) s.push('<path d="' + up.join("") + dn.join("") + 'Z" fill="' + COL.range + '"/>');
+  s.push('<path d="' + linePath(data.hi, yT) + '" fill="none" stroke="' + COL.hi + '" stroke-width="1.8"/>');
+  s.push('<path d="' + linePath(data.lo, yT) + '" fill="none" stroke="' + COL.lo + '" stroke-width="1.8"/>');
+  if (data.rh) s.push('<path d="' + linePath(data.rh, yT) + '" fill="none" stroke="' + COL.rhi + '" stroke-width="1.2"/>');
+  if (data.rl) s.push('<path d="' + linePath(data.rl, yT) + '" fill="none" stroke="' + COL.rlo + '" stroke-width="1.2"/>');
+  legend(s, SEC.temp, [[COL.hi, "Average High (°F)"], [COL.lo, "Average Low (°F)"], [COL.rhi, "Highest (10 yrs)"], [COL.rlo, "Lowest (10 yrs)"]]);
+
+  /* ---- precipitation ---- */
+  var pmax = 0;
+  for (i = 0; i < DAYS; i++) if (data.p[i] !== null && data.p[i] > pmax) pmax = data.p[i];
+  var psteps = [0.02, 0.05, 0.1, 0.2, 0.25, 0.5, 1, 2], pstep = 2;
+  var ptop = Math.max(pmax * 1.06, 0.04);
+  for (i = 0; i < psteps.length; i++) { if (ptop / psteps[i] <= 5.5) { pstep = psteps[i]; break; } }
+  var yP = function (v) { return SEC.precip.y + SEC.precip.h * (1 - v / ptop); };
+  grid(s, SEC.precip, 0, ptop, pstep, function (v) { return String(Math.round(v * 100) / 100); });
+  var pa = [], started = false;
+  for (i = 0; i < DAYS; i++) {
+    if (data.p[i] === null) continue;
+    pa.push((started ? "L" : "M" + xb(0).toFixed(1) + " " + yP(0).toFixed(1) + "L") + x(i).toFixed(1) + " " + yP(data.p[i]).toFixed(1));
+    started = true;
+  }
+  if (started) s.push('<path d="' + pa.join("") + "L" + xb(DAYS).toFixed(1) + " " + yP(0).toFixed(1) + 'Z" fill="' + COL.precipFill + '" fill-opacity="0.75"/>');
+  s.push('<path d="' + linePath(data.p, yP) + '" fill="none" stroke="' + COL.precipLine + '" stroke-width="1.2"/>');
+  /* weekly average overlay, smoothed: 7-day circular mean, then a triangular kernel pass */
+  var wk = [], sm = [], j, acc, cnt, vv, wgt, vsum, wsum;
+  for (i = 0; i < DAYS; i++) {
+    acc = 0; cnt = 0;
+    for (j = -3; j <= 3; j++) {
+      vv = data.p[(i + j + DAYS) % DAYS];
+      if (vv !== null) { acc += vv; cnt++; }
+    }
+    wk.push(cnt ? acc / cnt : null);
+  }
+  for (i = 0; i < DAYS; i++) {
+    vsum = 0; wsum = 0;
+    for (j = -10; j <= 10; j++) {
+      vv = wk[(i + j + DAYS) % DAYS];
+      if (vv === null) continue;
+      wgt = 11 - Math.abs(j);
+      vsum += vv * wgt; wsum += wgt;
+    }
+    sm.push(wsum ? vsum / wsum : null);
+  }
+  s.push('<path d="' + linePath(sm, yP) + '" fill="none" stroke="' + COL.mavg + '" stroke-width="2.2"/>');
+  legend(s, SEC.precip, [[COL.precipFill, "Avg Precipitation (in/day)"], [COL.mavg, "Weekly Average (smoothed)"]]);
+
+  /* crosshair + hover capture */
+  s.push('<line id="xh" x1="-10" y1="' + SEC.temp.y + '" x2="-10" y2="' + BOTTOM + '" stroke="#f6a04d" stroke-width="1.4" opacity="0"/>');
+  s.push('<rect x="0" y="0" width="' + W + '" height="' + SVGH + '" fill="transparent"/>');
+  s.push("</svg>");
+  $("chart").innerHTML = s.join("");
+
+  bindPointer();
+  $("title").textContent = locLabel(loc) + " Average Year (" + YEARS_LABEL + ")";
+  document.title = locLabel(loc, true) + " · Average Year";
+  var latN = Math.abs(loc.lat).toFixed(2) + "°" + (loc.lat >= 0 ? "N" : "S");
+  var lonW = Math.abs(loc.lon).toFixed(2) + "°" + (loc.lon >= 0 ? "E" : "W");
+  var elev = loc.elev !== undefined && loc.elev !== null ? " · Elev " + Math.round(loc.elev * 3.28084) + " ft" : "";
+  $("locmeta").innerHTML = latN + ", " + lonW + elev +
+    ' · <button title="Re-fetch" onclick="loadAverages(true)">⟳ refresh</button>';
+  renderRecents();
+  var scr = document.querySelector(".scroller");
+  if (scr && Math.max(900, scr.clientWidth - 2) !== W && !inRefit) {
+    inRefit = true; render(); inRefit = false;
+  }
+}
+var inRefit = false;
+
+function legend(s, sec, items) {
+  var y = sec.y + sec.h + 31, xr = W - PADR;
+  for (var i = items.length - 1; i >= 0; i--) {
+    var it = items[i], txtw = it[1].length * 6.1 + 20;
+    xr -= txtw;
+    s.push('<rect x="' + xr + '" y="' + (y - 9) + '" width="12" height="9" fill="' + it[0] + '"/>');
+    s.push('<text x="' + (xr + 16) + '" y="' + y + '" font-size="11" fill="#555">' + it[1] + "</text>");
+    xr -= 14;
+  }
+}
+
+/* ---------- tooltip ---------- */
+function bindPointer() {
+  var svg = $("wx"), tip = $("tip"), xh = $("xh"), box = $("chartbox");
+  function move(ev) {
+    var r = svg.getBoundingClientRect();
+    var px = ev.clientX - r.left, py = ev.clientY - r.top;
+    if (px < PADL - 4 || px > W - PADR + 4 || py < SEC.temp.y || py > BOTTOM) { hide(); return; }
+    var d = Math.max(0, Math.min(DAYS - 1, Math.round((px - PADL) / PLOTW * DAYS - 0.5)));
+    xh.setAttribute("x1", x(d)); xh.setAttribute("x2", x(d)); xh.setAttribute("opacity", "1");
+    var md = doyToMD(d), mn = MNAMES[md[0]];
+    var html = '<div class="t">' + mn + " " + md[1] + " · avg of " + YEARS_LABEL + "</div>" +
+      "🌡️ high " + (data.hi[d] === null ? "–" : Math.round(data.hi[d]) + "°F") +
+      " · low " + (data.lo[d] === null ? "–" : Math.round(data.lo[d]) + "°F") + "<br>" +
+      (data.rh && data.rh[d] !== null && data.rl && data.rl[d] !== null ?
+        "▲ " + Math.round(data.rh[d]) + "° highest" + (data.rhy && data.rhy[d] ? " (" + data.rhy[d] + ")" : "") +
+        " · ▼ " + Math.round(data.rl[d]) + "° lowest" + (data.rly && data.rly[d] ? " (" + data.rly[d] + ")" : "") + "<br>" : "") +
+      "💧 " + (data.p[d] === null ? "–" : fmtIn(data.p[d]) + " in this day") +
+      " · " + mn + " total " + fmtIn(data.mtot[md[0]], 1) + " in";
+    tip.innerHTML = html;
+    tip.style.display = "block";
+    var tw = tip.offsetWidth, th = tip.offsetHeight;
+    var lx = x(d) + 14;
+    if (lx + tw > W - 4) lx = x(d) - tw - 14;
+    tip.style.left = lx + "px";
+    tip.style.top = Math.max(SEC.temp.y + 6, Math.min(py - 20, BOTTOM - th - 4)) + "px";
+  }
+  function hide() { tip.style.display = "none"; xh.setAttribute("opacity", "0"); }
+  svg.addEventListener("pointermove", move);
+  svg.addEventListener("pointerdown", move);
+  svg.addEventListener("pointerleave", hide);
+}
+var resizeRaf = 0;
+window.addEventListener("resize", function () {
+  if (!resizeRaf) resizeRaf = requestAnimationFrame(function () { resizeRaf = 0; render(); });
+});
+
+/* ---------- location search + recents (same behavior as the 10-day page) ---------- */
+function renderRecents() {
+  var host = $("recents"); host.innerHTML = "";
+  recents.forEach(function (r, idx) {
+    var c = document.createElement("div");
+    c.className = "chip" + (sameLoc(r, loc) ? " active" : "");
+    var b = document.createElement("b"); b.textContent = locLabel(r, true); c.appendChild(b);
+    var xd = document.createElement("span"); xd.textContent = "×"; xd.title = "Remove";
+    xd.addEventListener("click", function (ev) { ev.stopPropagation(); recents.splice(idx, 1); save("bw_recents", recents); renderRecents(); });
+    c.appendChild(xd);
+    c.addEventListener("click", function () { selectLoc(r); });
+    host.appendChild(c);
+  });
+}
+function selectLoc(l) {
+  loc = l;
+  save("bw2_current", loc);
+  recents = recents.filter(function (r) { return !sameLoc(r, l); });
+  recents.unshift(l);
+  if (recents.length > 8) recents.length = 8;
+  save("bw_recents", recents);
+  renderRecents();
+  loadAverages();
+}
+var searchTimer = 0;
+$("q").addEventListener("input", function () {
+  clearTimeout(searchTimer);
+  var q = this.value.trim();
+  if (q.length < 2) { $("results").style.display = "none"; return; }
+  searchTimer = setTimeout(function () { geocode(q); }, 350);
+});
+$("q").addEventListener("keydown", function (ev) {
+  if (ev.key === "Escape") { $("results").style.display = "none"; }
+  if (ev.key === "Enter") {
+    var first = $("results").querySelector("div[data-i]");
+    if (first) first.click();
+  }
+});
+document.addEventListener("click", function (ev) {
+  if (!ev.target.closest(".searchwrap")) $("results").style.display = "none";
+});
+var lastResults = [];
+function geocode(q) {
+  fetch("https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(q) + "&count=6&language=en&format=json")
+    .then(function (r) { return r.json(); })
+    .then(function (r) {
+      var host = $("results"); host.innerHTML = "";
+      lastResults = (r.results || []).map(function (g) {
+        return { name: g.name, admin1: g.admin1 || "", cc: g.country_code || "", lat: g.latitude, lon: g.longitude, elev: g.elevation };
+      });
+      if (!lastResults.length) { host.innerHTML = '<div class="none">No matches</div>'; }
+      lastResults.forEach(function (g, i) {
+        var d = document.createElement("div");
+        d.setAttribute("data-i", i);
+        d.textContent = locLabel(g) + (g.cc && g.cc !== "US" ? "" : "");
+        d.addEventListener("click", function () {
+          $("q").value = ""; $("results").style.display = "none";
+          selectLoc(g);
+        });
+        host.appendChild(d);
+      });
+      host.style.display = "block";
+    })
+    .catch(function () {});
+}
+
+/* ---------- boot ---------- */
+window.__bw2 = { get data() { return data; }, get loc() { return loc; }, get recents() { return recents; } };
+renderRecents();
+loadAverages();
+</script>
+</body>
+</html>

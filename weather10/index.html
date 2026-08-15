@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Boat Weather</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⛵</text></svg>">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif; background: #eef1f4; color: #222; }
+  .page { margin: 0 auto; padding: 14px 20px 30px; }   /* full browser width, 20px side margins */
+  .card { background: #fff; border: 1px solid #dde2e8; border-radius: 8px; padding: 16px 16px 8px; }
+
+  header { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: flex-start; margin-bottom: 6px; }
+  .titleblock { flex: 1 1 340px; min-width: 260px; }
+  #nowbox { flex: 1 1 auto; display: none; align-items: center; justify-content: center; margin: 0 8px; }
+  .nowcard { display: flex; align-items: center; gap: 12px; border: 1px solid #d7dde3; border-radius: 10px;
+             padding: 8px 16px; background: #f8fafc; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+  #nowbox .nicon { font-size: 40px; line-height: 1; }
+  #nowbox .ntemp { font-size: 36px; font-weight: 600; }
+  #nowbox .ncond { font-size: 14.5px; color: #444; font-weight: 600; }
+  #nowbox .nsub { font-size: 12.5px; color: #777; margin-top: 2px; }
+  h1 { font-size: 22px; font-weight: 600; letter-spacing: .2px; }
+  #locmeta { font-size: 12px; color: #777; margin-top: 3px; }
+  #locmeta button { border: none; background: none; color: #1976d2; cursor: pointer; font-size: 13px; padding: 0 2px; }
+
+  .searchwrap { position: relative; flex: 0 1 300px; min-width: 230px; }
+  #q { width: 100%; padding: 8px 10px; font-size: 14px; border: 1px solid #c5ccd4; border-radius: 6px; outline: none; }
+  #q:focus { border-color: #1976d2; }
+  .pagelink { display: flex; justify-content: space-between; font-size: 16.5px; font-weight: 500; margin-top: 6px; }
+  .pagelink a { color: #1976d2; text-decoration: none; }
+  .pagelink a:hover { text-decoration: underline; }
+  #results { position: absolute; top: 100%; left: 0; right: 0; z-index: 30; background: #fff; border: 1px solid #c5ccd4;
+             border-radius: 0 0 6px 6px; box-shadow: 0 6px 16px rgba(0,0,0,.12); max-height: 240px; overflow-y: auto; }
+  #results div { padding: 8px 10px; font-size: 13px; cursor: pointer; }
+  #results div:hover, #results div.sel { background: #eaf3fc; }
+  #results .none { color: #999; cursor: default; }
+
+  #recents { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; background: #f1f3f6; border: 1px solid #d7dde3;
+          border-radius: 14px; padding: 4px 8px 4px 11px; cursor: pointer; user-select: none; }
+  .chip.active { background: #e3f0fb; border-color: #90bfe8; color: #0d5ba1; font-weight: 600; }
+  .chip b { font-weight: inherit; }
+  .chip span { color: #98a2ad; font-size: 13px; line-height: 1; padding: 1px 3px; border-radius: 8px; }
+  .chip span:hover { background: #d9dee4; color: #555; }
+
+  .toggle { font-size: 12.5px; color: #555; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  .toggle .dash { display: inline-block; width: 22px; border-top: 2px dashed #e67e22; }
+
+  #status { font-size: 13px; color: #888; padding: 8px 2px; min-height: 20px; }
+  #status .err { color: #c0392b; }
+  #status button { margin-left: 8px; font-size: 12.5px; cursor: pointer; }
+
+  .scroller { overflow-x: auto; }
+  .chartbox { position: relative; width: 1080px; }
+  .chartbox.loading { min-height: 340px; }
+  #loading { position: absolute; inset: 0; z-index: 25; display: none; align-items: center; justify-content: center;
+             background: rgba(255,255,255,.55); }
+  .chartbox.loading #loading { display: flex; }
+  .spin { width: 52px; height: 52px; border: 5px solid #cfe0f0; border-top-color: #1976d2; border-radius: 50%;
+          animation: bwspin .9s linear infinite; }
+  @keyframes bwspin { to { transform: rotate(360deg); } }
+  svg text { font-family: inherit; }
+  #tip { position: absolute; display: none; z-index: 20; background: rgba(255,255,255,.97); border: 1px solid #b9c2cb;
+         border-radius: 8px; box-shadow: 0 3px 10px rgba(0,0,0,.15); padding: 11px 15px; font-size: 19px; line-height: 1.5;
+         pointer-events: none; white-space: nowrap; }
+  #tip .t { font-weight: 600; }
+  #tip .hrrr { color: #b35c00; font-size: 17px; }
+  #chart .rsz { cursor: ns-resize; touch-action: none; }
+  #chart .rsz:hover line { stroke: #5b6672; }
+  .foot { font-size: 11.5px; color: #98a2ad; padding: 10px 2px 6px; }
+  .foot a { color: #1976d2; text-decoration: none; }
+  .foot a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="card">
+    <header>
+      <div class="titleblock">
+        <h1 id="title">10-Day Weather Forecast</h1>
+        <div id="locmeta"></div>
+      </div>
+      <div id="nowbox"></div>
+      <div class="searchwrap">
+        <input id="q" type="text" placeholder="Add location (city or town)…" autocomplete="off" spellcheck="false">
+        <div id="results" hidden></div>
+        <div class="pagelink"><a href="/weather3/">3-day</a><a href="/weather365/">Historical</a></div>
+      </div>
+      <div id="recents"></div>
+      <label class="toggle"><input type="checkbox" id="hrrrToggle"> <span class="dash"></span> HRRR short-range overlay (next 2 days)</label>
+    </header>
+    <div id="status"></div>
+    <div class="scroller">
+      <div class="chartbox" id="chartbox">
+        <div id="loading"><div class="spin"></div></div>
+        <div id="tip"></div>
+        <div id="chart"></div>
+      </div>
+    </div>
+    <div class="foot">Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> · forecast: ECMWF 10-day model · orange dashes: NOAA HRRR (short-range) · precip chance from ensemble blend · updates hourly on the half hour</div>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ---------- constants ---------- */
+var PADL = 46, PADR = 12, HOURS = 240, DAYSN = HOURS / 24;
+/* chart heights are user-resizable via corner grips; these defaults are also the minimums.
+   Width is automatic: charts fill the browser (1080 floor scrolls sideways on small screens). */
+var DEFSIZE = { temp: 150, wind: 140, cloud: 140, accum: 72 };
+var sizes = load("bw_sizes") || {};
+Object.keys(DEFSIZE).forEach(function (k) { if (!(sizes[k] >= DEFSIZE[k])) sizes[k] = DEFSIZE[k]; });
+delete sizes.width;                          /* leftover from the pre-auto-width version */
+var W, PLOTW, SEC, BOTTOM, SVGH;
+function applyLayout() {
+  var scr = document.querySelector(".scroller");
+  /* -2px slack: at fractional display scaling (e.g. Windows 125%) an exact-width chart can
+     leave a sub-pixel overflow that renders a useless scrollbar */
+  W = Math.max(1080, (scr ? scr.clientWidth : 0) - 2);
+  PLOTW = W - PADL - PADR;
+  var GAP = 58, y;                           /* gap holds each chart's legend row */
+  SEC = { days: { y: 0, h: 126 }, temp: { y: 126, h: sizes.temp } };  /* temp flush against the day strip */
+  y = 126 + sizes.temp;
+  SEC.wind  = { y: y + GAP, h: sizes.wind };  y += GAP + sizes.wind;
+  SEC.cloud = { y: y + GAP, h: sizes.cloud }; y += GAP + sizes.cloud;
+  SEC.accum = { y: y + GAP, h: sizes.accum };
+  BOTTOM = SEC.accum.y + SEC.accum.h;
+  SVGH = BOTTOM + 34;
+}
+applyLayout();
+var COL = {
+  temp: "#cf3049", feels: "#9b59b6", windLine: "#93c4ec", windArrow: "#14396e", gust: "#b6c3d2",
+  cloudFill: "#c9ced4", cloudLine: "#8a939c", probFill: "#8fd0f0", probLine: "#2a92cf",
+  accumFill: "#9bd7ea", accumLine: "#3fa7c9", hourlyP: "#1e7d32", hrrr: "#e67e22",
+  grid: "#e8eaed", dayline: "#aeb6c0", band: "#f5f7f9", now: "#444"
+};
+var DEFAULT_LOC = { name: "Kirkland", admin1: "Washington", cc: "US", lat: 47.68, lon: -122.19, elev: 47 };
+var COMPASS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+var WD = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+/* ---------- state ---------- */
+var loc = load("bw_current") || DEFAULT_LOC;
+var recents = load("bw_recents") || [DEFAULT_LOC];
+var showHrrr = load("bw_hrrr");
+if (showHrrr === null) showHrrr = true;
+var data = null;          /* built forecast bundle for the tooltip + redraws */
+var fetchToken = 0;
+
+function load(k) { try { var v = localStorage.getItem(k); return v === null ? null : JSON.parse(v); } catch (e) { return null; } }
+function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+function $(id) { return document.getElementById(id); }
+function setLoading(on) { $("chartbox").className = "chartbox" + (on ? " loading" : ""); }
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+
+/* ---------- helpers ---------- */
+function locLabel(l, short) {
+  var a = l.admin1 || "";
+  var s = l.name + (a && a !== l.name ? ", " + a : "");
+  if (l.cc && l.cc !== "US") s += " (" + l.cc + ")";
+  return short ? l.name : s;
+}
+function sameLoc(a, b) { return Math.abs(a.lat - b.lat) < 0.005 && Math.abs(a.lon - b.lon) < 0.005; }
+function compass(deg) { return COMPASS[Math.round(deg / 22.5) % 16]; }
+function x(i) { return PADL + (i + 0.5) / HOURS * PLOTW; }          /* hour centers */
+function xb(h) { return PADL + h / HOURS * PLOTW; }                 /* exact hour boundaries */
+/* nice-round axis top: single digit x power of ten, whole ticks */
+function niceTop(m) {
+  if (!(m > 0)) return 1;
+  var k = Math.pow(10, Math.floor(Math.log10(m)));
+  var d = Math.ceil(m / k);
+  return d * k;
+}
+function tickStep(top) {
+  var divs = [4, 5, 3, 2];
+  for (var i = 0; i < divs.length; i++) {
+    var st = top / divs[i];
+    if (st === Math.floor(st)) return st;
+  }
+  return top / 4;
+}
+function fmtHour(h) { var ap = h < 12 ? "AM" : "PM"; var v = h % 12; if (v === 0) v = 12; return v + " " + ap; }
+function fmtIn(v) { return (Math.round(v * 100) / 100).toFixed(2); }
+
+/* WMO weather code + cloud % -> icon and wording for the day strip */
+function dayIcon(codes, clouds, psum) {
+  var worst = 0, fog = 0;
+  for (var i = 0; i < codes.length; i++) {
+    var c = codes[i] || 0;
+    if (c === 45 || c === 48) fog++;
+    if (c > worst) worst = c;
+  }
+  if (worst >= 95) return ["⛈️", "T-Storms"];
+  if (worst >= 71 && worst <= 86 && worst !== 80 && worst !== 81 && worst !== 82) return ["🌨️", "Snow"];
+  if (psum >= 0.1 && worst >= 61) return ["🌧️", "Rain"];
+  if (psum >= 0.03 && worst >= 51) return ["🌦️", "Showers"];
+  if (fog >= 3) return ["🌫️", "Fog"];
+  var avg = 0;
+  for (var j = 0; j < clouds.length; j++) avg += clouds[j];
+  avg = clouds.length ? avg / clouds.length : 0;
+  if (avg < 15) return ["☀️", "Sunny"];
+  if (avg < 40) return ["🌤️", "Mostly Sunny"];
+  if (avg < 70) return ["⛅", "Partly Cloudy"];
+  if (avg < 88) return ["🌥️", "Mostly Cloudy"];
+  return ["☁️", "Cloudy"];
+}
+
+/* polyline path, splitting at nulls */
+function linePath(vals, yFn, step) {
+  var d = "", pen = false;
+  for (var i = 0; i < vals.length; i += (step || 1)) {
+    var v = vals[i];
+    if (v === null || v === undefined) { pen = false; continue; }
+    d += (pen ? "L" : "M") + x(i).toFixed(1) + "," + yFn(v).toFixed(1);
+    pen = true;
+  }
+  return d;
+}
+/* filled area from a series down to the section floor */
+function areaPath(vals, yFn, floorY) {
+  var d = "", start = -1;
+  for (var i = 0; i < vals.length; i++) {
+    var v = vals[i];
+    if (v === null || v === undefined) continue;
+    if (start < 0) { start = i; d += "M" + x(i).toFixed(1) + "," + floorY + "L"; }
+    d += x(i).toFixed(1) + "," + yFn(v).toFixed(1) + " ";
+  }
+  if (start >= 0) d += "L" + x(vals.length - 1).toFixed(1) + "," + floorY + "Z";
+  return d;
+}
+
+/* ---------- data fetch ---------- */
+function api(params) {
+  var u = new URLSearchParams(params);
+  u.set("latitude", loc.lat); u.set("longitude", loc.lon);
+  u.set("timezone", "auto"); u.set("temperature_unit", "fahrenheit");
+  u.set("wind_speed_unit", "mph"); u.set("precipitation_unit", "inch");
+  return fetch("https://api.open-meteo.com/v1/forecast?" + u).then(function (r) {
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  });
+}
+
+function loadForecast() {
+  var token = ++fetchToken;
+  $("status").textContent = "Loading forecast for " + locLabel(loc) + "…";
+  setLoading(true);
+  Promise.all([
+    api({ models: "ecmwf_ifs025", forecast_days: 10,
+          hourly: "temperature_2m,apparent_temperature,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m" }),
+    api({ forecast_days: 10, hourly: "precipitation_probability", daily: "sunrise,sunset",
+          current: "temperature_2m,apparent_temperature,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m,is_day" }),
+    api({ models: "gfs_hrrr", forecast_days: 3,
+          hourly: "temperature_2m,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m" })
+      .catch(function () { return null; })                      /* overlay is optional; page works without it */
+  ]).then(function (res) {
+    if (token !== fetchToken) return;
+    build(res[0], res[1], res[2]);
+    $("status").textContent = "";
+    render();
+    setLoading(false);
+  }).catch(function (e) {
+    if (token !== fetchToken) return;
+    $("status").innerHTML = '<span class="err">Could not load the forecast (' + esc(e.message) +
+      ').</span><button onclick="loadForecast()">Try again</button>';
+    setLoading(false);
+  });
+}
+
+function build(ec, pr, hr) {
+  var h = ec.hourly, times = h.time;
+  var byTime = {};
+  for (var i = 0; i < times.length; i++) byTime[times[i]] = i;
+
+  /* align ensemble probability + HRRR overlay onto the primary hour index */
+  var prob = new Array(times.length).fill(null);
+  if (pr && pr.hourly) for (var p = 0; p < pr.hourly.time.length; p++) {
+    var pi = byTime[pr.hourly.time[p]];
+    if (pi !== undefined) prob[pi] = pr.hourly.precipitation_probability[p];
+  }
+  var hrrr = { temp: new Array(times.length).fill(null), cloud: new Array(times.length).fill(null),
+               wspd: new Array(times.length).fill(null), wgst: new Array(times.length).fill(null),
+               wdir: new Array(times.length).fill(null), any: false };
+  if (hr && hr.hourly) for (var q = 0; q < hr.hourly.time.length; q++) {
+    var qi = byTime[hr.hourly.time[q]];
+    if (qi === undefined || hr.hourly.temperature_2m[q] === null) continue;
+    hrrr.temp[qi] = hr.hourly.temperature_2m[q];
+    hrrr.cloud[qi] = hr.hourly.cloud_cover[q];
+    hrrr.wspd[qi] = hr.hourly.wind_speed_10m[q];
+    hrrr.wgst[qi] = hr.hourly.wind_gusts_10m[q];
+    hrrr.wdir[qi] = hr.hourly.wind_direction_10m[q];
+    hrrr.any = true;
+  }
+
+  /* cumulative precip */
+  var accum = [], run = 0;
+  for (var a = 0; a < times.length; a++) { run += (h.precipitation[a] || 0); accum.push(run); }
+
+  /* day summaries */
+  var days = [];
+  for (var d = 0; d < times.length; d += 24) {
+    var slice = { codes: [], clouds: [], hi: -999, lo: 999, psum: 0 };
+    for (var j = d; j < Math.min(d + 24, times.length); j++) {
+      var hh = j - d;
+      slice.hi = Math.max(slice.hi, h.temperature_2m[j]);
+      slice.lo = Math.min(slice.lo, h.temperature_2m[j]);
+      slice.psum += (h.precipitation[j] || 0);
+      if (hh >= 8 && hh <= 20) { slice.codes.push(h.weather_code[j]); slice.clouds.push(h.cloud_cover[j]); }
+    }
+    var t = times[d];
+    var y = +t.slice(0, 4), mo = +t.slice(5, 7), dd = +t.slice(8, 10);
+    slice.label = WD[new Date(Date.UTC(y, mo - 1, dd)).getUTCDay()] + " " + mo + "/" + dd;
+    var ic = dayIcon(slice.codes, slice.clouds, slice.psum);
+    slice.icon = ic[0]; slice.cond = ic[1];
+    days.push(slice);
+  }
+
+  /* sunrise / sunset per day (from the ensemble call's daily block) */
+  function clock12(iso) { var hh = +iso.slice(11, 13); return (hh % 12 || 12) + ":" + iso.slice(14, 16); }
+  if (pr && pr.daily && pr.daily.sunrise) {
+    for (i = 0; i < days.length; i++) {
+      var srT = pr.daily.sunrise[i], ssT = pr.daily.sunset[i];
+      if (!srT || !ssT) continue;
+      days[i].srF = i * 24 + (+srT.slice(11, 13)) + (+srT.slice(14, 16)) / 60;
+      days[i].ssF = i * 24 + (+ssT.slice(11, 13)) + (+ssT.slice(14, 16)) / 60;
+      days[i].srS = clock12(srT);
+      days[i].ssS = clock12(ssT);
+    }
+  }
+
+  /* "now" position in the location's wall clock */
+  var locNow = new Date(Date.now() + ec.utc_offset_seconds * 1000);
+  var nowKey = locNow.toISOString().slice(0, 13) + ":00";
+  var nowIdx = byTime[nowKey];
+
+  data = { times: times, temp: h.temperature_2m, feels: h.apparent_temperature, precip: h.precipitation,
+           cloud: h.cloud_cover, wspd: h.wind_speed_10m, wgst: h.wind_gusts_10m, wdir: h.wind_direction_10m,
+           prob: prob, accum: accum, hrrr: hrrr, days: days, now: (pr && pr.current) || null,
+           nowIdx: (nowIdx === undefined ? null : nowIdx),
+           nowFrac: (nowIdx === undefined ? null : nowIdx + locNow.getUTCMinutes() / 60), fetched: new Date() };
+}
+
+/* current conditions in the header (top center) */
+function codeIcon(code, cloud, isDay) {
+  if (code >= 95) return ["⛈️", "T-Storms"];
+  if (code >= 71 && code <= 86 && code !== 80 && code !== 81 && code !== 82) return ["🌨️", "Snow"];
+  if ((code >= 61 && code <= 67) || (code >= 80 && code <= 82)) return ["🌧️", code >= 80 ? "Showers" : "Rain"];
+  if (code >= 51 && code <= 57) return ["🌦️", "Drizzle"];
+  if (code === 45 || code === 48) return ["🌫️", "Fog"];
+  if (cloud < 15) return [isDay ? "☀️" : "🌙", isDay ? "Sunny" : "Clear"];
+  if (cloud < 45) return [isDay ? "🌤️" : "🌙", isDay ? "Mostly Sunny" : "Mostly Clear"];
+  if (cloud < 80) return ["⛅", "Partly Cloudy"];
+  return ["☁️", "Cloudy"];
+}
+function nextSunEvent() {
+  if (data.nowFrac === null) return null;
+  for (var d = 0; d < data.days.length; d++) {
+    var dd = data.days[d];
+    if (dd.srF === undefined) continue;
+    if (dd.srF > data.nowFrac) return "sunrise " + dd.srS + "am";
+    if (dd.ssF > data.nowFrac) return "sunset " + dd.ssS + "pm";
+  }
+  return null;
+}
+function renderNow() {
+  var n = data.now, box = $("nowbox");
+  if (!n || n.temperature_2m === null || n.temperature_2m === undefined) { box.style.display = "none"; return; }
+  var ic = codeIcon(n.weather_code || 0, n.cloud_cover === null ? 50 : n.cloud_cover, n.is_day !== 0);
+  var sun = nextSunEvent();
+  box.innerHTML = '<div class="nowcard"><div class="nicon">' + ic[0] + '</div><div class="ntemp">' + Math.round(n.temperature_2m) + "°</div>" +
+    '<div><div class="ncond">' + ic[1] + "</div>" +
+    '<div class="nsub">feels ' + Math.round(n.apparent_temperature) + "° · " + compass(n.wind_direction_10m) + " " +
+    Math.round(n.wind_speed_10m) + " mph · gusts " + Math.round(n.wind_gusts_10m) + "</div>" +
+    (sun ? '<div class="nsub">' + sun + "</div>" : "") + "</div></div>";
+  box.style.display = "flex";
+}
+
+/* ---------- render ---------- */
+function render() {
+  if (!data) return;
+  applyLayout();
+  $("chartbox").style.width = W + "px";
+  var s = [], i, d;
+  s.push('<svg id="wx" width="' + W + '" height="' + SVGH + '" viewBox="0 0 ' + W + " " + SVGH + '">');
+
+  /* day boundary lines only - no alternating fill, the night shading owns the background */
+  [SEC.days, SEC.temp, SEC.wind, SEC.cloud, SEC.accum].forEach(function (sec) {
+    for (var l = 0; l <= DAYSN; l++) {
+      s.push('<line x1="' + xb(l * 24) + '" y1="' + sec.y + '" x2="' + xb(l * 24) + '" y2="' + (sec.y + sec.h) + '" stroke="' + COL.dayline + '" stroke-width="1.3"/>');
+    }
+  });
+
+  /* night shading: dusk-to-dawn tint across the chart sections */
+  [SEC.temp, SEC.wind, SEC.cloud, SEC.accum].forEach(function (sec) {
+    for (var nd = 0; nd < data.days.length; nd++) {
+      var dd = data.days[nd];
+      if (dd.srF === undefined) continue;
+      s.push('<rect x="' + xb(nd * 24).toFixed(1) + '" y="' + sec.y + '" width="' + (xb(dd.srF) - xb(nd * 24)).toFixed(1) +
+             '" height="' + sec.h + '" fill="#c8d6e8" fill-opacity="0.55"/>');
+      s.push('<rect x="' + xb(dd.ssF).toFixed(1) + '" y="' + sec.y + '" width="' + (xb((nd + 1) * 24) - xb(dd.ssF)).toFixed(1) +
+             '" height="' + sec.h + '" fill="#c8d6e8" fill-opacity="0.55"/>');
+    }
+  });
+
+  /* ---- day strip ---- */
+  for (d = 0; d < data.days.length; d++) {
+    var dy = data.days[d], cx = xb(d * 24) + PLOTW / (DAYSN * 2);
+    s.push('<text x="' + cx + '" y="16" text-anchor="middle" font-size="12.5" font-weight="600" fill="#333">' + dy.label + "</text>");
+    s.push('<text x="' + cx + '" y="34" text-anchor="middle" font-size="12.5"><tspan fill="' + COL.temp + '" font-weight="600">' +
+           Math.round(dy.hi) + "°</tspan><tspan fill=\"#999\"> | " + Math.round(dy.lo) + "°</tspan></text>");
+    s.push('<text x="' + cx + '" y="66" text-anchor="middle" font-size="26">' + dy.icon + "</text>");
+    s.push('<text x="' + cx + '" y="86" text-anchor="middle" font-size="10.5" fill="#666">' + dy.cond + "</text>");
+    var wet = dy.psum >= 0.005;
+    s.push('<text x="' + cx + '" y="103" text-anchor="middle" font-size="10.5" fill="' + (wet ? "#1976d2" : "#9aa3ac") + '">' +
+           (wet ? "💧 " : "") + (wet ? fmtIn(dy.psum) : "0") + " in</text>");
+    if (dy.srS) s.push('<text x="' + cx + '" y="119" text-anchor="middle" font-size="10" fill="#e07408"><tspan font-weight="700">↑</tspan>' +
+                       dy.srS + "am  " + '<tspan font-weight="700">↓</tspan>' + dy.ssS + "pm</text>");
+  }
+
+  /* ---- temperature ---- */
+  var tmin = 999, tmax = -999;
+  for (i = 0; i < HOURS; i++) {
+    tmin = Math.min(tmin, data.temp[i], data.feels[i]);
+    tmax = Math.max(tmax, data.temp[i], data.feels[i]);
+  }
+  var tlo = Math.floor((tmin - 3) / 10) * 10, thi = Math.ceil((tmax + 3) / 10) * 10;
+  var yT = function (v) { return SEC.temp.y + SEC.temp.h * (1 - (v - tlo) / (thi - tlo)); };
+  grid(s, SEC.temp, tlo, thi, 10, function (v) { return v + " F"; });
+  s.push('<path d="' + linePath(data.feels, yT) + '" fill="none" stroke="' + COL.feels + '" stroke-width="1.6" opacity=".9"/>');
+  s.push('<path d="' + linePath(data.temp, yT) + '" fill="none" stroke="' + COL.temp + '" stroke-width="2"/>');
+  if (showHrrr) s.push('<path d="' + linePath(data.hrrr.temp, yT) + '" fill="none" stroke="' + COL.hrrr + '" stroke-width="1.4" stroke-dasharray="5 3"/>');
+  legend(s, SEC.temp, [[COL.feels, "Feels Like (°F)"], [COL.temp, "Temperature (°F)"]].concat(hrrrLegend()));
+
+  /* ---- wind ---- */
+  var wmax = 0;                               /* max over the series actually drawn */
+  for (i = 0; i < HOURS; i++) wmax = Math.max(wmax, data.wgst[i] || 0, data.wspd[i] || 0, (showHrrr && data.hrrr.wspd[i]) || 0);
+  var wtop = Math.max(wmax, 5);               /* axis tops out at the strongest gust of the period */
+  var yW = function (v) { return SEC.wind.y + SEC.wind.h * (1 - v / wtop); };
+  var wsteps = [1, 2, 5, 10, 20, 25, 50], wstep = 50;
+  for (i = 0; i < wsteps.length; i++) { if (wtop / wsteps[i] <= 5.5) { wstep = wsteps[i]; break; } }
+  grid(s, SEC.wind, 0, wtop, wstep, function (v) { return String(v); });
+  s.push('<path d="' + linePath(data.wgst, yW) + '" fill="none" stroke="' + COL.gust + '" stroke-width="1.3" stroke-dasharray="3 3"/>');
+  if (showHrrr) s.push('<path d="' + linePath(data.hrrr.wspd, yW) + '" fill="none" stroke="' + COL.hrrr + '" stroke-width="1.4" stroke-dasharray="5 3"/>');
+  s.push('<path d="' + linePath(data.wspd, yW) + '" fill="none" stroke="' + COL.windLine + '" stroke-width="2.2"/>');
+  for (i = 1; i < HOURS; i += 3) {              /* direction arrows: point where the wind is going */
+    var spd = data.wspd[i], dir = data.wdir[i];
+    if (spd === null || dir === null) continue;
+    s.push('<g transform="translate(' + x(i).toFixed(1) + "," + yW(spd).toFixed(1) + ") rotate(" + ((dir + 180) % 360) + ')">' +
+           '<path d="M0,-6.4 L4.1,5.4 L0,2.5 L-4.1,5.4 Z" fill="' + COL.windArrow + '" stroke="#fff" stroke-width="0.6"/></g>');
+  }
+  legend(s, SEC.wind, [[COL.windLine, "Wind Speed (mph) + direction"], [COL.gust, "Gusts (mph)"]].concat(hrrrLegend()));
+
+  /* ---- cloud cover / precip chance ---- */
+  var yC = function (v) { return SEC.cloud.y + SEC.cloud.h * (1 - v / 100); };
+  grid(s, SEC.cloud, 0, 100, 25, function (v) { return v + "%"; });
+  s.push('<path d="' + areaPath(data.cloud, yC, SEC.cloud.y + SEC.cloud.h) + '" fill="' + COL.cloudFill + '" opacity=".75" stroke="' + COL.cloudLine + '" stroke-width="1"/>');
+  s.push('<path d="' + areaPath(data.prob, yC, SEC.cloud.y + SEC.cloud.h) + '" fill="' + COL.probFill + '" opacity=".65" stroke="' + COL.probLine + '" stroke-width="1"/>');
+  if (showHrrr) s.push('<path d="' + linePath(data.hrrr.cloud, yC) + '" fill="none" stroke="' + COL.hrrr + '" stroke-width="1.4" stroke-dasharray="5 3"/>');
+  legend(s, SEC.cloud, [[COL.cloudFill, "Cloud Cover (%)"], [COL.probFill, "Chance of Precip. (%)"]].concat(hrrrLegend()));
+
+  /* ---- precip accumulation ---- */
+  var amax = data.accum[HOURS - 1];
+  var atop = amax <= 1 ? 1 : niceTop(amax);
+  var yA = function (v) { return SEC.accum.y + SEC.accum.h * (1 - v / atop); };
+  grid(s, SEC.accum, 0, atop, atop / 2, function (v) { return v.toFixed(1); });
+  s.push('<path d="' + areaPath(data.accum, yA, SEC.accum.y + SEC.accum.h) + '" fill="' + COL.accumFill + '" opacity=".55" stroke="' + COL.accumLine + '" stroke-width="1.2"/>');
+  s.push('<path d="' + linePath(data.precip, yA) + '" fill="none" stroke="' + COL.hourlyP + '" stroke-width="1.5"/>');
+  legend(s, SEC.accum, [[COL.accumFill, "Precip. Accum. Total (in)"], [COL.hourlyP, "Hourly Precip. (in)"]]);
+
+  /* "now" marker */
+  if (data.nowIdx !== null) {
+    var nx = x(data.nowIdx);
+    s.push('<line x1="' + nx + '" y1="' + SEC.days.h + '" x2="' + nx + '" y2="' + BOTTOM + '" stroke="' + COL.now + '" stroke-width="1.4"/>');
+  }
+
+  /* crosshair (hidden until hover/touch) */
+  s.push('<line id="xh" x1="-10" y1="' + SEC.temp.y + '" x2="-10" y2="' + BOTTOM + '" stroke="#f6a04d" stroke-width="1.4" opacity="0"/>');
+  s.push('<rect x="0" y="0" width="' + W + '" height="' + SVGH + '" fill="transparent"/>');
+  /* resize grips, drawn last so they sit on top of the hover-capture rect */
+  ["temp", "wind", "cloud", "accum"].forEach(function (k) {
+    var sec = SEC[k];
+    var g = ['<g class="rsz" data-sec="' + k + '" transform="translate(' + (W - PADR - 3) + "," + (sec.y + sec.h - 3) + ')">',
+             '<rect x="-16" y="-16" width="20" height="20" fill="transparent"/>'];
+    for (var gl = 0; gl < 3; gl++) {
+      var o = 3 + gl * 4;
+      g.push('<line x1="' + (-o) + '" y1="1" x2="1" y2="' + (-o) + '" stroke="#9aa5b1" stroke-width="1.6"/>');
+    }
+    s.push(g.join("") + "</g>");
+  });
+  s.push("</svg>");
+  $("chart").innerHTML = s.join("");
+
+  bindPointer();
+  $("title").textContent = locLabel(loc) + " 10-Day Weather Forecast";
+  document.title = locLabel(loc, true) + " · Boat Weather";
+  renderNow();
+  var latN = Math.abs(loc.lat).toFixed(2) + "°" + (loc.lat >= 0 ? "N" : "S");
+  var lonW = Math.abs(loc.lon).toFixed(2) + "°" + (loc.lon >= 0 ? "E" : "W");
+  var elev = loc.elev !== undefined && loc.elev !== null ? " · Elev " + Math.round(loc.elev * 3.28084) + " ft" : "";
+  $("locmeta").innerHTML = latN + ", " + lonW + elev + " · updated " +
+    data.fetched.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) +
+    ' <button title="Refresh" onclick="loadForecast()">⟳ refresh</button>';
+  renderRecents();
+  /* rendering can add/remove the page scrollbar, changing the available width; refit once */
+  var scr = document.querySelector(".scroller");
+  if (scr && Math.max(1080, scr.clientWidth - 2) !== W && !inRefit) {
+    inRefit = true; render(); inRefit = false;
+  }
+}
+var inRefit = false;
+
+function hrrrLegend() { return showHrrr && data.hrrr.any ? [[COL.hrrr, "HRRR", true]] : []; }
+
+function grid(s, sec, lo, hi, step, fmt) {
+  for (var v = lo; v <= hi + 1e-9; v += step) {
+    var y = sec.y + sec.h * (1 - (v - lo) / (hi - lo));
+    s.push('<line x1="' + PADL + '" y1="' + y.toFixed(1) + '" x2="' + (W - PADR) + '" y2="' + y.toFixed(1) + '" stroke="' + COL.grid + '" stroke-width="1"/>');
+    s.push('<text x="' + (PADL - 5) + '" y="' + (y + 3.5).toFixed(1) + '" text-anchor="end" font-size="10" fill="#8a939c">' + fmt(v) + "</text>");
+  }
+}
+
+function legend(s, sec, items) {
+  var y = sec.y + sec.h + 16, xr = W - PADR;
+  for (var i = items.length - 1; i >= 0; i--) {
+    var it = items[i], txtw = it[1].length * 6.1 + 20;
+    xr -= txtw;
+    if (it[2]) s.push('<line x1="' + xr + '" y1="' + (y - 4) + '" x2="' + (xr + 12) + '" y2="' + (y - 4) + '" stroke="' + it[0] + '" stroke-width="2.2" stroke-dasharray="4 2.5"/>');
+    else s.push('<rect x="' + xr + '" y="' + (y - 9) + '" width="12" height="9" fill="' + it[0] + '"/>');
+    s.push('<text x="' + (xr + 16) + '" y="' + y + '" font-size="11" fill="#555">' + it[1] + "</text>");
+    xr -= 14;
+  }
+}
+
+/* ---------- tooltip ---------- */
+function bindPointer() {
+  var svg = $("wx"), tip = $("tip"), xh = $("xh"), box = $("chartbox");
+  function move(ev) {
+    if (resizing) return;                     /* no tooltip while dragging a grip */
+    var r = svg.getBoundingClientRect();
+    var px = ev.clientX - r.left, py = ev.clientY - r.top;
+    if (px < PADL - 4 || px > W - PADR + 4 || py < SEC.days.h || py > BOTTOM) { hide(); return; }
+    var i = Math.max(0, Math.min(HOURS - 1, Math.round((px - PADL) / PLOTW * HOURS - 0.5)));
+    xh.setAttribute("x1", x(i)); xh.setAttribute("x2", x(i)); xh.setAttribute("opacity", "1");
+    var t = data.times[i], hr = +t.slice(11, 13), day = data.days[Math.floor(i / 24)];
+    var html = '<div class="t">' + day.label + ", " + fmtHour(hr) + "</div>" +
+      (day.srS ? "☀ rise " + day.srS + "am · set " + day.ssS + "pm<br>" : "") +
+      "🌡️ " + Math.round(data.temp[i]) + "°F · feels " + Math.round(data.feels[i]) + "°<br>" +
+      "💨 " + Math.round(data.wspd[i]) + " mph from " + compass(data.wdir[i]) +
+      " · gusts " + Math.round(data.wgst[i]) + "<br>" +
+      "☁️ " + Math.round(data.cloud[i]) + "%" +
+      (data.prob[i] !== null ? " · precip chance " + Math.round(data.prob[i]) + "%" : "") + "<br>" +
+      "💧 Accum " + fmtIn(data.accum[i]) + " in";
+    if (showHrrr && data.hrrr.wspd[i] !== null) {
+      html += '<br><span class="hrrr">HRRR: ' + Math.round(data.hrrr.wspd[i]) + " mph from " +
+              compass(data.hrrr.wdir[i]) + " · " + Math.round(data.hrrr.temp[i]) + "° · cloud " +
+              Math.round(data.hrrr.cloud[i]) + "%</span>";
+    }
+    tip.innerHTML = html;
+    tip.style.display = "block";
+    var bw = box.clientWidth, tw = tip.offsetWidth, th = tip.offsetHeight;
+    var lx = x(i) + 14;
+    if (lx + tw > W - 4) lx = x(i) - tw - 14;
+    tip.style.left = lx + "px";
+    tip.style.top = Math.max(SEC.days.h + 6, Math.min(py - 20, BOTTOM - th - 4)) + "px";
+  }
+  function hide() { tip.style.display = "none"; xh.setAttribute("opacity", "0"); }
+  svg.addEventListener("pointermove", move);
+  svg.addEventListener("pointerdown", function (ev) {
+    var h = ev.target.closest ? ev.target.closest(".rsz") : null;
+    if (!h) { move(ev); return; }
+    ev.preventDefault();
+    var k = h.getAttribute("data-sec");
+    resizing = { sec: k, y0: ev.clientY, h0: sizes[k] };
+    hide();
+  });
+  svg.addEventListener("dblclick", function (ev) {  /* double-click a grip: back to defaults */
+    if (ev.target.closest && ev.target.closest(".rsz")) {
+      Object.keys(DEFSIZE).forEach(function (k) { sizes[k] = DEFSIZE[k]; });
+      save("bw_sizes", sizes); render();
+    }
+  });
+  svg.addEventListener("pointerleave", hide);
+}
+
+/* ---------- chart resize drag (window-level so re-renders mid-drag don't drop it) ---------- */
+var resizing = null, resizeRaf = 0;
+window.addEventListener("pointermove", function (ev) {
+  if (!resizing) return;
+  sizes[resizing.sec] = Math.round(Math.max(DEFSIZE[resizing.sec], resizing.h0 + (ev.clientY - resizing.y0)));
+  if (!resizeRaf) resizeRaf = requestAnimationFrame(function () { resizeRaf = 0; render(); });
+});
+window.addEventListener("resize", function () {  /* browser resized: refit chart width */
+  if (!resizeRaf) resizeRaf = requestAnimationFrame(function () { resizeRaf = 0; render(); });
+});
+window.addEventListener("pointerup", function () {
+  if (resizing) { resizing = null; save("bw_sizes", sizes); }
+});
+
+/* ---------- location search + recents ---------- */
+function renderRecents() {
+  var host = $("recents"); host.innerHTML = "";
+  recents.forEach(function (r, idx) {
+    var c = document.createElement("div");
+    c.className = "chip" + (sameLoc(r, loc) ? " active" : "");
+    c.title = locLabel(r);
+    var b = document.createElement("b"); b.textContent = locLabel(r, true); c.appendChild(b);
+    var xbtn = document.createElement("span"); xbtn.textContent = "×"; xbtn.title = "Remove";
+    xbtn.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      recents.splice(idx, 1); save("bw_recents", recents); renderRecents();
+    });
+    c.appendChild(xbtn);
+    c.addEventListener("click", function () { if (!sameLoc(r, loc)) setLocation(r); });
+    host.appendChild(c);
+  });
+}
+
+function setLocation(l) {
+  loc = l; save("bw_current", loc);
+  var hit = recents.findIndex(function (r) { return sameLoc(r, l); });
+  if (hit >= 0) recents.splice(hit, 1);
+  recents.unshift(l);
+  if (recents.length > 8) recents.length = 8;
+  save("bw_recents", recents);
+  renderRecents();
+  loadForecast();
+}
+
+var searchTimer = null, searchSeq = 0;
+function wireSearch() {
+  var q = $("q"), res = $("results");
+  q.addEventListener("input", function () {
+    clearTimeout(searchTimer);
+    var text = q.value.trim();
+    if (text.length < 2) { res.hidden = true; return; }
+    searchTimer = setTimeout(function () { doSearch(text); }, 320);
+  });
+  q.addEventListener("keydown", function (ev) {
+    if (ev.key === "Escape") { res.hidden = true; }
+    if (ev.key === "Enter") {
+      var first = res.querySelector("div[data-i]");
+      if (!res.hidden && first) first.click();
+    }
+  });
+  document.addEventListener("click", function (ev) {
+    if (!ev.target.closest(".searchwrap")) res.hidden = true;
+  });
+}
+
+function doSearch(text) {
+  var seq = ++searchSeq, res = $("results");
+  fetch("https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(text) + "&count=6&language=en&format=json")
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      if (seq !== searchSeq) return;
+      res.innerHTML = "";
+      var list = (j && j.results) || [];
+      if (!list.length) { res.innerHTML = '<div class="none">No matches</div>'; res.hidden = false; return; }
+      list.forEach(function (g, i) {
+        var d = document.createElement("div");
+        d.setAttribute("data-i", i);
+        d.textContent = g.name + (g.admin1 ? ", " + g.admin1 : "") + (g.country_code !== "US" ? " · " + (g.country || g.country_code) : "");
+        d.addEventListener("click", function () {
+          res.hidden = true; $("q").value = "";
+          setLocation({ name: g.name, admin1: g.admin1 || "", cc: g.country_code || "", lat: g.latitude, lon: g.longitude, elev: g.elevation });
+        });
+        res.appendChild(d);
+      });
+      res.hidden = false;
+    })
+    .catch(function () { if (seq === searchSeq) { res.innerHTML = '<div class="none">Search failed</div>'; res.hidden = false; } });
+}
+
+/* ---------- boot ---------- */
+$("hrrrToggle").checked = showHrrr;
+$("hrrrToggle").addEventListener("change", function () {
+  showHrrr = this.checked; save("bw_hrrr", showHrrr); render();
+});
+wireSearch();
+renderRecents();
+loadForecast();
+setInterval(loadForecast, 30 * 60 * 1000);
+window.__bw = { get data() { return data; }, get loc() { return loc; }, get recents() { return recents; } };
+</script>
+</body>
+</html>
