@@ -134,7 +134,7 @@ var COL = {
   temp: "#cf3049", feels: "#9b59b6", windLine: "#93c4ec", windArrow: "#14396e", gust: "#b6c3d2",
   cloudFill: "#c9ced4", cloudLine: "#8a939c", probFill: "#8fd0f0", probLine: "#2a92cf",
   accumFill: "#9bd7ea", accumLine: "#3fa7c9", hourlyP: "#1e7d32", hrrr: "#e67e22",
-  grid: "#e8eaed", dayline: "#dcdfe3", band: "#f5f7f9", now: "#444"
+  grid: "#e8eaed", dayline: "#aeb6c0", band: "#f5f7f9", now: "#444"
 };
 var DEFAULT_LOC = { name: "Kirkland", admin1: "Washington", cc: "US", lat: 47.68, lon: -122.19, elev: 47 };
 var COMPASS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
@@ -371,13 +371,10 @@ function render() {
   var s = [], i, d;
   s.push('<svg id="wx" width="' + W + '" height="' + SVGH + '" viewBox="0 0 ' + W + " " + SVGH + '">');
 
-  /* alternating day bands + day boundary lines, per section so the charts stay visually separate */
+  /* day boundary lines only - no alternating fill, the night shading owns the background */
   [SEC.days, SEC.temp, SEC.wind, SEC.cloud, SEC.accum].forEach(function (sec) {
-    for (var b = 0; b < 10; b++) {
-      if (b % 2 === 1) s.push('<rect x="' + xb(b * 24) + '" y="' + sec.y + '" width="' + (PLOTW / 10) + '" height="' + sec.h + '" fill="' + COL.band + '"/>');
-    }
     for (var l = 0; l <= 10; l++) {
-      s.push('<line x1="' + xb(l * 24) + '" y1="' + sec.y + '" x2="' + xb(l * 24) + '" y2="' + (sec.y + sec.h) + '" stroke="' + COL.dayline + '" stroke-width="1"/>');
+      s.push('<line x1="' + xb(l * 24) + '" y1="' + sec.y + '" x2="' + xb(l * 24) + '" y2="' + (sec.y + sec.h) + '" stroke="' + COL.dayline + '" stroke-width="1.3"/>');
     }
   });
 
