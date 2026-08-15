@@ -121,8 +121,8 @@ function applyLayout() {
   W = Math.max(1080, (scr ? scr.clientWidth : 0) - 2);
   PLOTW = W - PADL - PADR;
   var GAP = 58, y;                           /* gap holds each chart's legend row */
-  SEC = { days: { y: 0, h: 110 }, temp: { y: 110, h: sizes.temp } };  /* temp flush against the day strip */
-  y = 110 + sizes.temp;
+  SEC = { days: { y: 0, h: 126 }, temp: { y: 126, h: sizes.temp } };  /* temp flush against the day strip */
+  y = 126 + sizes.temp;
   SEC.wind  = { y: y + GAP, h: sizes.wind };  y += GAP + sizes.wind;
   SEC.cloud = { y: y + GAP, h: sizes.cloud }; y += GAP + sizes.cloud;
   SEC.accum = { y: y + GAP, h: sizes.accum };
@@ -249,7 +249,7 @@ function loadForecast() {
   Promise.all([
     api({ models: "ecmwf_ifs025", forecast_days: 10,
           hourly: "temperature_2m,apparent_temperature,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m" }),
-    api({ forecast_days: 10, hourly: "precipitation_probability",
+    api({ forecast_days: 10, hourly: "precipitation_probability", daily: "sunrise,sunset",
           current: "temperature_2m,apparent_temperature,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m,is_day" }),
     api({ models: "gfs_hrrr", forecast_days: 3,
           hourly: "temperature_2m,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m" })
@@ -316,6 +316,19 @@ function build(ec, pr, hr) {
     days.push(slice);
   }
 
+  /* sunrise / sunset per day (from the ensemble call's daily block) */
+  function clock12(iso) { var hh = +iso.slice(11, 13); return (hh % 12 || 12) + ":" + iso.slice(14, 16); }
+  if (pr && pr.daily && pr.daily.sunrise) {
+    for (i = 0; i < days.length; i++) {
+      var srT = pr.daily.sunrise[i], ssT = pr.daily.sunset[i];
+      if (!srT || !ssT) continue;
+      days[i].srF = i * 24 + (+srT.slice(11, 13)) + (+srT.slice(14, 16)) / 60;
+      days[i].ssF = i * 24 + (+ssT.slice(11, 13)) + (+ssT.slice(14, 16)) / 60;
+      days[i].srS = clock12(srT);
+      days[i].ssS = clock12(ssT);
+    }
+  }
+
   /* "now" position in the location's wall clock */
   var locNow = new Date(Date.now() + ec.utc_offset_seconds * 1000);
   var nowKey = locNow.toISOString().slice(0, 13) + ":00";
@@ -368,6 +381,18 @@ function render() {
     }
   });
 
+  /* night shading: dusk-to-dawn tint across the chart sections */
+  [SEC.temp, SEC.wind, SEC.cloud, SEC.accum].forEach(function (sec) {
+    for (var nd = 0; nd < data.days.length; nd++) {
+      var dd = data.days[nd];
+      if (dd.srF === undefined) continue;
+      s.push('<rect x="' + xb(nd * 24).toFixed(1) + '" y="' + sec.y + '" width="' + (xb(dd.srF) - xb(nd * 24)).toFixed(1) +
+             '" height="' + sec.h + '" fill="#dce6f2" fill-opacity="0.35"/>');
+      s.push('<rect x="' + xb(dd.ssF).toFixed(1) + '" y="' + sec.y + '" width="' + (xb((nd + 1) * 24) - xb(dd.ssF)).toFixed(1) +
+             '" height="' + sec.h + '" fill="#dce6f2" fill-opacity="0.35"/>');
+    }
+  });
+
   /* ---- day strip ---- */
   for (d = 0; d < data.days.length; d++) {
     var dy = data.days[d], cx = xb(d * 24) + PLOTW / 20;
@@ -379,6 +404,8 @@ function render() {
     var wet = dy.psum >= 0.005;
     s.push('<text x="' + cx + '" y="103" text-anchor="middle" font-size="10.5" fill="' + (wet ? "#1976d2" : "#9aa3ac") + '">' +
            (wet ? "💧 " : "") + (wet ? fmtIn(dy.psum) : "0") + " in</text>");
+    if (dy.srS) s.push('<text x="' + cx + '" y="119" text-anchor="middle" font-size="10" fill="#c08a12">↑' +
+                       dy.srS + "  ↓" + dy.ssS + "</text>");
   }
 
   /* ---- temperature ---- */
@@ -507,6 +534,7 @@ function bindPointer() {
     xh.setAttribute("x1", x(i)); xh.setAttribute("x2", x(i)); xh.setAttribute("opacity", "1");
     var t = data.times[i], hr = +t.slice(11, 13), day = data.days[Math.floor(i / 24)];
     var html = '<div class="t">' + day.label + ", " + fmtHour(hr) + "</div>" +
+      (day.srS ? "☀ rise " + day.srS + " AM · set " + day.ssS + " PM<br>" : "") +
       "🌡️ " + Math.round(data.temp[i]) + "°F · feels " + Math.round(data.feels[i]) + "°<br>" +
       "💨 " + Math.round(data.wspd[i]) + " mph from " + compass(data.wdir[i]) +
       " · gusts " + Math.round(data.wgst[i]) + "<br>" +
