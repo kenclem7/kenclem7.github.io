@@ -337,7 +337,8 @@ function build(ec, pr, hr) {
   data = { times: times, temp: h.temperature_2m, feels: h.apparent_temperature, precip: h.precipitation,
            cloud: h.cloud_cover, wspd: h.wind_speed_10m, wgst: h.wind_gusts_10m, wdir: h.wind_direction_10m,
            prob: prob, accum: accum, hrrr: hrrr, days: days, now: (pr && pr.current) || null,
-           nowIdx: (nowIdx === undefined ? null : nowIdx), fetched: new Date() };
+           nowIdx: (nowIdx === undefined ? null : nowIdx),
+           nowFrac: (nowIdx === undefined ? null : nowIdx + locNow.getUTCMinutes() / 60), fetched: new Date() };
 }
 
 /* current conditions in the header (top center) */
@@ -352,14 +353,26 @@ function codeIcon(code, cloud, isDay) {
   if (cloud < 80) return ["⛅", "Partly Cloudy"];
   return ["☁️", "Cloudy"];
 }
+function nextSunEvent() {
+  if (data.nowFrac === null) return null;
+  for (var d = 0; d < data.days.length; d++) {
+    var dd = data.days[d];
+    if (dd.srF === undefined) continue;
+    if (dd.srF > data.nowFrac) return "🌅 sunrise " + dd.srS + " AM";
+    if (dd.ssF > data.nowFrac) return "🌇 sunset " + dd.ssS + " PM";
+  }
+  return null;
+}
 function renderNow() {
   var n = data.now, box = $("nowbox");
   if (!n || n.temperature_2m === null || n.temperature_2m === undefined) { box.style.display = "none"; return; }
   var ic = codeIcon(n.weather_code || 0, n.cloud_cover === null ? 50 : n.cloud_cover, n.is_day !== 0);
+  var sun = nextSunEvent();
   box.innerHTML = '<div class="nowcard"><div class="nicon">' + ic[0] + '</div><div class="ntemp">' + Math.round(n.temperature_2m) + "°</div>" +
     '<div><div class="ncond">' + ic[1] + "</div>" +
     '<div class="nsub">feels ' + Math.round(n.apparent_temperature) + "° · " + compass(n.wind_direction_10m) + " " +
-    Math.round(n.wind_speed_10m) + " mph · gusts " + Math.round(n.wind_gusts_10m) + "</div></div></div>";
+    Math.round(n.wind_speed_10m) + " mph · gusts " + Math.round(n.wind_gusts_10m) + "</div>" +
+    (sun ? '<div class="nsub">' + sun + "</div>" : "") + "</div></div>";
   box.style.display = "flex";
 }
 
