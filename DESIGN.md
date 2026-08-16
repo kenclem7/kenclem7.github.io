@@ -63,7 +63,7 @@ Everything else (DAYSN = HOURS/24) derives at runtime. The two pages share all l
 
 **Location entry, three ways:**
 1. Search box: Open-Meteo geocoding, dropdown, Enter picks first.
-2. **Use Map**: modal with OSM map, click drops a pin, Nominatim names it (coordinates stand in over open water), "Use this location".
+2. **Use Map**: modal with OSM map, click drops a pin, "Use this location". Naming chain: Nominatim locality for land clicks; when no locality comes back (water), BigDataCloud's free reverse-geocode-client names the body of water and the result reads "Pacific Ocean near Avalon" style, with the "near" harbor taken from the nearest NOAA tide station within 80 mi (first comma-part of the station name). Far offshore it is just the water name; if everything fails, the coordinates stand. Never trust Nominatim's `j.name` (it returns "United States" for territorial water - the original bug).
 3. Share links: `?lat&lon&name&admin1&cc&elev` params override the saved city without touching it. The **share** button (locmeta row, left of refresh) copies such a link for the current view.
 
 Recents are a pull-down under the search row (#recwrap, exactly the width of input + Use Map): the button shows the active city with a caret, the menu lists up to 8 recents (active row highlighted, per-row × remove), shared across all three pages via `bw_recents`. Outside click or Escape closes it.
