@@ -69,6 +69,10 @@
   #tip .hrrr { color: #b35c00; font-size: 17px; }
   #chart .rsz { cursor: ns-resize; touch-action: none; }
   #chart .rsz:hover line { stroke: #5b6672; }
+  #chart .drag { cursor: grab; touch-action: none; }
+  #chart .drag:hover circle { fill: #6b7683; }
+  #chart .drag.on { cursor: grabbing; }
+  #chart .drag.on circle { fill: #1976d2; }
   .foot { font-size: 11.5px; color: #98a2ad; padding: 10px 2px 6px; }
   .foot a { color: #1976d2; text-decoration: none; }
   .foot a:hover { text-decoration: underline; }
@@ -106,13 +110,21 @@
 <script>
 "use strict";
 /* ---------- constants ---------- */
-var PADL = 46, PADR = 12, HOURS = 72, DAYSN = HOURS / 24;
+var PADL = 64, PADR = 12, HOURS = 72, DAYSN = HOURS / 24;   /* PADL also holds the drag handles */
 /* chart heights are user-resizable via corner grips; these defaults are also the minimums.
    Width is automatic: charts fill the browser (1080 floor scrolls sideways on small screens). */
-var DEFSIZE = { temp: 150, wind: 140, cloud: 140, accum: 72 };
+var DEFSIZE = { temp: 150, wind: 140, cloud: 140, vis: 110, accum: 72, tide: 130 };
+var DEFORDER = ["temp", "wind", "cloud", "vis", "accum", "tide"];
 var sizes = load("bw_sizes") || {};
 Object.keys(DEFSIZE).forEach(function (k) { if (!(sizes[k] >= DEFSIZE[k])) sizes[k] = DEFSIZE[k]; });
 delete sizes.width;                          /* leftover from the pre-auto-width version */
+var order = load("bw_order");                /* user-draggable row order */
+if (!Array.isArray(order) || order.length !== DEFORDER.length ||
+    DEFORDER.some(function (k) { return order.indexOf(k) < 0; })) order = DEFORDER.slice();
+/* rows actually drawn: the tide row only exists when a NOAA station is in range */
+function rows() {
+  return order.filter(function (k) { return k !== "tide" || !!(data && data.tide); });
+}
 var W, PLOTW, SEC, BOTTOM, SVGH;
 function applyLayout() {
   var scr = document.querySelector(".scroller");
@@ -120,13 +132,14 @@ function applyLayout() {
      leave a sub-pixel overflow that renders a useless scrollbar */
   W = Math.max(1080, (scr ? scr.clientWidth : 0) - 2);
   PLOTW = W - PADL - PADR;
-  var GAP = 58, y;                           /* gap holds each chart's legend row */
-  SEC = { days: { y: 0, h: 136 }, temp: { y: 136, h: sizes.temp } };  /* temp flush against the day strip */
-  y = 136 + sizes.temp;
-  SEC.wind  = { y: y + GAP, h: sizes.wind };  y += GAP + sizes.wind;
-  SEC.cloud = { y: y + GAP, h: sizes.cloud }; y += GAP + sizes.cloud;
-  SEC.accum = { y: y + GAP, h: sizes.accum };
-  BOTTOM = SEC.accum.y + SEC.accum.h;
+  var GAP = 58, y = 136;                     /* gap holds each chart's legend row */
+  SEC = { days: { y: 0, h: 136 } };          /* first row sits flush against the day strip */
+  rows().forEach(function (k, i) {
+    if (i) y += GAP;
+    SEC[k] = { y: y, h: sizes[k] };
+    y += sizes[k];
+  });
+  BOTTOM = y;
   SVGH = BOTTOM + 34;
 }
 applyLayout();
@@ -134,7 +147,9 @@ var COL = {
   temp: "#cf3049", feels: "#9b59b6", windLine: "#93c4ec", windArrow: "#14396e", gust: "#b6c3d2",
   cloudFill: "#c9ced4", cloudLine: "#8a939c", probFill: "#8fd0f0", probLine: "#2a92cf",
   accumFill: "#9bd7ea", accumLine: "#3fa7c9", hourlyP: "#1e7d32", hrrr: "#e67e22",
-  grid: "#e8eaed", dayline: "#aeb6c0", band: "#f5f7f9", now: "#444"
+  grid: "#e8eaed", dayline: "#aeb6c0", band: "#f5f7f9", now: "#444",
+  visFill: "#dfe6ec", visLine: "#7f8c99", fogBand: "#f7e2c6", fogLine: "#d98a2b",
+  tideFill: "#bfe3f2", tideLine: "#2b8cb8", curLine: "#7b4fa8"
 };
 var DEFAULT_LOC = { name: "Kirkland", admin1: "Washington", cc: "US", lat: 47.68, lon: -122.19, elev: 47 };
 var COMPASS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
@@ -209,6 +224,12 @@ function tickStep(top) {
   return top / 4;
 }
 function fmtHour(h) { var ap = h < 12 ? "AM" : "PM"; var v = h % 12; if (v === 0) v = 12; return v + " " + ap; }
+function fmtClock(i) {                       /* fractional hour column -> "10:13am" */
+  var h = Math.floor(i) % 24, m = Math.round((i - Math.floor(i)) * 60);
+  if (m === 60) { m = 0; h = (h + 1) % 24; }
+  var ap = h < 12 ? "am" : "pm", v = h % 12; if (v === 0) v = 12;
+  return v + ":" + (m < 10 ? "0" : "") + m + ap;
+}
 function fmtIn(v) { return (Math.round(v * 100) / 100).toFixed(2); }
 
 /* WMO weather code + cloud % -> icon and wording for the day strip */
@@ -247,14 +268,15 @@ function linePath(vals, yFn, step) {
 }
 /* filled area from a series down to the section floor */
 function areaPath(vals, yFn, floorY) {
-  var d = "", start = -1;
+  var d = "", start = -1, last = -1;
   for (var i = 0; i < vals.length; i++) {
     var v = vals[i];
     if (v === null || v === undefined) continue;
     if (start < 0) { start = i; d += "M" + x(i).toFixed(1) + "," + floorY + "L"; }
     d += x(i).toFixed(1) + "," + yFn(v).toFixed(1) + " ";
+    last = i;
   }
-  if (start >= 0) d += "L" + x(vals.length - 1).toFixed(1) + "," + floorY + "Z";
+  if (start >= 0) d += "L" + x(last).toFixed(1) + "," + floorY + "Z";   /* close at real data, not the axis end */
   return d;
 }
 
@@ -277,7 +299,7 @@ function loadForecast() {
   Promise.all([
     api({ models: "ecmwf_ifs025", forecast_days: 3,
           hourly: "temperature_2m,apparent_temperature,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m" }),
-    api({ forecast_days: 3, hourly: "precipitation_probability", daily: "sunrise,sunset",
+    api({ forecast_days: 3, hourly: "precipitation_probability,visibility", daily: "sunrise,sunset",
           current: "temperature_2m,apparent_temperature,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m,is_day" }),
     api({ models: "gfs_hrrr", forecast_days: 3,
           hourly: "temperature_2m,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m" })
@@ -288,12 +310,101 @@ function loadForecast() {
     $("status").textContent = "";
     render();
     setLoading(false);
+    loadTides();                              /* NOAA data arrives later and re-renders */
   }).catch(function (e) {
     if (token !== fetchToken) return;
     $("status").innerHTML = '<span class="err">Could not load the forecast (' + esc(e.message) +
       ').</span><button onclick="loadForecast()">Try again</button>';
     setLoading(false);
   });
+}
+
+/* ---------- tides + currents (NOAA CO-OPS, public domain) ---------- */
+var stationLists = {};
+function loadStations(kind) {
+  if (stationLists[kind]) return Promise.resolve(stationLists[kind]);
+  return fetch("/data/" + kind + "-stations.json").then(function (r) { return r.json(); })
+    .then(function (j) { stationLists[kind] = j; return j; });
+}
+function nearestStation(list, latIdx, lonIdx) {
+  var best = null, bd = 1e9, i, dy, dx, d;
+  for (i = 0; i < list.length; i++) {
+    dy = (list[i][latIdx] - loc.lat) * 69;
+    dx = (list[i][lonIdx] - loc.lon) * 69 * Math.cos(loc.lat * Math.PI / 180);
+    d = Math.sqrt(dx * dx + dy * dy);
+    if (d < bd) { bd = d; best = list[i]; }
+  }
+  return best ? { row: best, mi: Math.round(bd * 10) / 10 } : null;
+}
+var NOAA = "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?units=english&time_zone=lst_ldt&format=json";
+function ymd(t) { return t.slice(0, 10).replace(/-/g, ""); }
+function hourIndexMap() {                     /* "2026-08-18 14" -> hour column */
+  var m = {}, t = data.times;
+  for (var i = 0; i < t.length; i++) m[t[i].slice(0, 13).replace("T", " ")] = i;
+  return m;
+}
+function loadTides() {
+  var tok = fetchToken, t = data.times, idx = hourIndexMap();
+  var span = "&begin_date=" + ymd(t[0]) + "&end_date=" + ymd(t[t.length - 1]);
+  loadStations("tide").then(function (list) {
+    var n = nearestStation(list, 2, 3);
+    if (!n || n.mi > 60) return null;         /* nothing close enough to mean anything */
+    var u = NOAA + "&product=predictions&datum=MLLW&station=" + n.row[0] + span;
+    return Promise.all([
+      fetch(u + "&interval=h").then(function (r) { return r.json(); }),
+      fetch(u + "&interval=hilo").then(function (r) { return r.json(); })
+    ]).then(function (res) {
+      if (tok !== fetchToken) return null;
+      var h = new Array(HOURS).fill(null), ev = [], k, ix;
+      (res[0].predictions || []).forEach(function (p) {
+        ix = idx[p.t.slice(0, 13)];
+        if (ix !== undefined) h[ix] = +p.v;
+      });
+      (res[1].predictions || []).forEach(function (p) {
+        ix = idx[p.t.slice(0, 13)];
+        if (ix !== undefined) ev.push({ i: ix + (+p.t.slice(14, 16)) / 60, v: +p.v, type: p.type });
+      });
+      if (!h.some(function (v) { return v !== null; })) return null;
+      return { station: n.row[1], mi: n.mi, h: h, events: ev, cur: null };
+    });
+  }).then(function (tide) {
+    if (!tide || tok !== fetchToken) return;
+    data.tide = tide;
+    render();
+    loadCurrents(tok, idx, span);
+  }).catch(function () {});
+}
+function loadCurrents(tok, idx, span) {
+  loadStations("current").then(function (list) {
+    var n = nearestStation(list, 3, 4);
+    if (!n || n.mi > 25) return;
+    var u = NOAA + "&product=currents_predictions&interval=MAX_SLACK&station=" + n.row[0] + "&bin=" + n.row[1] + span;
+    return fetch(u).then(function (r) { return r.json(); }).then(function (j) {
+      if (tok !== fetchToken || !data.tide) return;
+      var cp = j.current_predictions && j.current_predictions.cp;
+      if (typeof cp === "string") {            /* NOAA's own words, e.g. "weak and variable" */
+        data.tide.cur = { station: n.row[2], mi: n.mi, note: cp };
+        render();
+        return;
+      }
+      var pts = [], ix;
+      (cp || []).forEach(function (q) {
+        ix = idx[q.Time.slice(0, 13)];
+        if (ix !== undefined) pts.push({ i: ix + (+q.Time.slice(14, 16)) / 60, v: +q.Velocity_Major });
+      });
+      if (pts.length < 2) return;
+      var v = new Array(HOURS).fill(null), a, b, x2, f;
+      for (var k = 0; k + 1 < pts.length; k++) {       /* cosine ease between slack and max = tidal curve */
+        a = pts[k]; b = pts[k + 1];
+        for (x2 = Math.ceil(a.i); x2 <= Math.floor(b.i) && x2 < HOURS; x2++) {
+          f = (x2 - a.i) / (b.i - a.i);
+          v[x2] = a.v + (b.v - a.v) * (1 - Math.cos(Math.PI * f)) / 2;
+        }
+      }
+      data.tide.cur = { station: n.row[2], mi: n.mi, v: v, events: pts };
+      render();
+    });
+  }).catch(function () {});
 }
 
 function build(ec, pr, hr) {
@@ -303,9 +414,13 @@ function build(ec, pr, hr) {
 
   /* align ensemble probability + HRRR overlay onto the primary hour index */
   var prob = new Array(times.length).fill(null);
+  var vis = new Array(times.length).fill(null);      /* ECMWF carries no visibility; this is best-match */
   if (pr && pr.hourly) for (var p = 0; p < pr.hourly.time.length; p++) {
     var pi = byTime[pr.hourly.time[p]];
-    if (pi !== undefined) prob[pi] = pr.hourly.precipitation_probability[p];
+    if (pi === undefined) continue;
+    prob[pi] = pr.hourly.precipitation_probability[p];
+    var vm = pr.hourly.visibility ? pr.hourly.visibility[p] : null;
+    if (vm !== null && vm !== undefined) vis[pi] = vm / 1609.34;   /* metres -> statute miles */
   }
   var hrrr = { temp: new Array(times.length).fill(null), cloud: new Array(times.length).fill(null),
                wspd: new Array(times.length).fill(null), wgst: new Array(times.length).fill(null),
@@ -364,7 +479,8 @@ function build(ec, pr, hr) {
 
   data = { times: times, temp: h.temperature_2m, feels: h.apparent_temperature, precip: h.precipitation,
            cloud: h.cloud_cover, wspd: h.wind_speed_10m, wgst: h.wind_gusts_10m, wdir: h.wind_direction_10m,
-           prob: prob, accum: accum, hrrr: hrrr, days: days, now: (pr && pr.current) || null,
+           prob: prob, vis: vis, accum: accum, hrrr: hrrr, days: days, now: (pr && pr.current) || null,
+           tide: null,
            nowIdx: (nowIdx === undefined ? null : nowIdx),
            nowFrac: (nowIdx === undefined ? null : nowIdx + locNow.getUTCMinutes() / 60), fetched: new Date() };
 }
@@ -413,14 +529,15 @@ function render() {
   s.push('<svg id="wx" width="' + W + '" height="' + SVGH + '" viewBox="0 0 ' + W + " " + SVGH + '">');
 
   /* day boundary lines only - no alternating fill, the night shading owns the background */
-  [SEC.days, SEC.temp, SEC.wind, SEC.cloud, SEC.accum].forEach(function (sec) {
+  var plotSecs = rows().map(function (k) { return SEC[k]; });
+  [SEC.days].concat(plotSecs).forEach(function (sec) {
     for (var l = 0; l <= DAYSN; l++) {
       s.push('<line x1="' + xb(l * 24) + '" y1="' + sec.y + '" x2="' + xb(l * 24) + '" y2="' + (sec.y + sec.h) + '" stroke="' + COL.dayline + '" stroke-width="1.3"/>');
     }
   });
 
   /* night shading: dusk-to-dawn tint across the chart sections */
-  [SEC.temp, SEC.wind, SEC.cloud, SEC.accum].forEach(function (sec) {
+  plotSecs.forEach(function (sec) {
     for (var nd = 0; nd < data.days.length; nd++) {
       var dd = data.days[nd];
       if (dd.srF === undefined) continue;
@@ -496,6 +613,63 @@ function render() {
   s.push('<path d="' + linePath(data.precip, yA) + '" fill="none" stroke="' + COL.hourlyP + '" stroke-width="1.5"/>');
   legend(s, SEC.accum, [[COL.accumFill, "Precip. Accum. Total (in)"], [COL.hourlyP, "Hourly Precip. (in)"]]);
 
+  /* ---- visibility / fog ---- */
+  var VMAX = 10, hasVis = data.vis.some(function (v) { return v !== null; });
+  var yV = function (v) { return SEC.vis.y + SEC.vis.h * (1 - Math.min(v, VMAX) / VMAX); };
+  grid(s, SEC.vis, 0, VMAX, 2.5, function (v) { return v + " mi"; });
+  if (hasVis) {
+    var fogY = yV(1);                          /* under 1 mile is fog by any definition */
+    s.push('<rect x="' + PADL + '" y="' + fogY.toFixed(1) + '" width="' + PLOTW + '" height="' +
+           (SEC.vis.y + SEC.vis.h - fogY).toFixed(1) + '" fill="' + COL.fogBand + '" opacity=".5"/>');
+    s.push('<line x1="' + PADL + '" y1="' + fogY.toFixed(1) + '" x2="' + (W - PADR) + '" y2="' + fogY.toFixed(1) +
+           '" stroke="' + COL.fogLine + '" stroke-width="1" stroke-dasharray="4 3"/>');
+    /* a line, not a filled area: visibility sits pinned at the top most of the time */
+    s.push('<path d="' + linePath(data.vis.map(function (v) { return v === null ? null : Math.min(v, VMAX); }), yV) +
+           '" fill="none" stroke="' + COL.visLine + '" stroke-width="2"/>');
+    legend(s, SEC.vis, [[COL.visLine, "Visibility (miles, 10 = clear)"], [COL.fogBand, "Fog (under 1 mi)"]]);
+  } else {
+    s.push('<text x="' + (PADL + PLOTW / 2) + '" y="' + (SEC.vis.y + SEC.vis.h / 2) +
+           '" text-anchor="middle" font-size="13" fill="#9aa3ac">No visibility data for this location</text>');
+    legend(s, SEC.vis, [[COL.visFill, "Visibility (miles)"]]);
+  }
+
+  /* ---- tide + current ---- */
+  if (SEC.tide) {
+    var td = data.tide, tvals = td.h.filter(function (v) { return v !== null; });
+    var dlo = Math.min.apply(null, tvals), dhi = Math.max.apply(null, tvals);
+    var dpad = Math.max(0.4, (dhi - dlo) * 0.15);
+    var tLo = Math.floor(dlo - dpad), tHi = Math.ceil(dhi + dpad);
+    var yD = function (v) { return SEC.tide.y + SEC.tide.h * (1 - (v - tLo) / (tHi - tLo)); };
+    grid(s, SEC.tide, tLo, tHi, (tHi - tLo) / 4, function (v) { return v.toFixed(1); });
+    if (tLo < 0) s.push('<line x1="' + PADL + '" y1="' + yD(0).toFixed(1) + '" x2="' + (W - PADR) + '" y2="' +
+                        yD(0).toFixed(1) + '" stroke="#9fb6c4" stroke-width="1" stroke-dasharray="3 3"/>');
+    s.push('<path d="' + areaPath(td.h, yD, SEC.tide.y + SEC.tide.h) + '" fill="' + COL.tideFill +
+           '" opacity=".8" stroke="' + COL.tideLine + '" stroke-width="1.5"/>');
+    td.events.forEach(function (e) {           /* label each high and low with its time */
+      var ex = PADL + (e.i + 0.5) / HOURS * PLOTW, ey = yD(e.v), up = e.type === "H";
+      if (ex < PADL || ex > W - PADR) return;
+      s.push('<circle cx="' + ex.toFixed(1) + '" cy="' + ey.toFixed(1) + '" r="2.6" fill="' + COL.tideLine + '"/>');
+      s.push('<text x="' + ex.toFixed(1) + '" y="' + (ey + (up ? -7 : 15)).toFixed(1) +
+             '" text-anchor="middle" font-size="10.5" fill="' + COL.tideLine + '">' +
+             e.v.toFixed(1) + "' " + fmtClock(e.i) + "</text>");
+    });
+    var tideLegend = [[COL.tideFill, "Tide (ft, " + td.station + ", " + td.mi + " mi)"]];
+    if (td.cur && td.cur.v) {                  /* current shares the row on its own ± scale */
+      var cmax = 0;
+      td.cur.v.forEach(function (v) { if (v !== null && Math.abs(v) > cmax) cmax = Math.abs(v); });
+      cmax = Math.max(cmax, 0.5);
+      var mid = SEC.tide.y + SEC.tide.h / 2, span = SEC.tide.h * 0.38;
+      var yCur = function (v) { return mid - (v / cmax) * span; };
+      s.push('<line x1="' + PADL + '" y1="' + mid + '" x2="' + (W - PADR) + '" y2="' + mid +
+             '" stroke="' + COL.curLine + '" stroke-width="1" stroke-dasharray="2 4" opacity=".55"/>');
+      s.push('<path d="' + linePath(td.cur.v, yCur) + '" fill="none" stroke="' + COL.curLine + '" stroke-width="1.8"/>');
+      tideLegend.push([COL.curLine, "Current (kn, +flood / −ebb, max " + cmax.toFixed(1) + ")"]);
+    } else if (td.cur && td.cur.note) {
+      tideLegend.push(["#c9ced4", td.cur.station + ": " + td.cur.note.toLowerCase()]);
+    }
+    legend(s, SEC.tide, tideLegend);
+  }
+
   /* "now" marker */
   if (data.nowIdx !== null) {
     var nx = x(data.nowIdx);
@@ -505,14 +679,22 @@ function render() {
   /* crosshair (hidden until hover/touch) */
   s.push('<line id="xh" x1="-10" y1="' + SEC.temp.y + '" x2="-10" y2="' + BOTTOM + '" stroke="#f6a04d" stroke-width="1.4" opacity="0"/>');
   s.push('<rect x="0" y="0" width="' + W + '" height="' + SVGH + '" fill="transparent"/>');
-  /* resize grips, drawn last so they sit on top of the hover-capture rect */
-  ["temp", "wind", "cloud", "accum"].forEach(function (k) {
-    var sec = SEC[k];
-    var g = ['<g class="rsz" data-sec="' + k + '" transform="translate(' + (W - PADR - 3) + "," + (sec.y + sec.h - 3) + ')">',
-             '<rect x="-16" y="-16" width="20" height="20" fill="transparent"/>'];
-    for (var gl = 0; gl < 3; gl++) {
-      var o = 3 + gl * 4;
+  /* grips, drawn last so they sit on top of the hover-capture rect */
+  rows().forEach(function (k) {
+    var sec = SEC[k], g, gl, o, r, c;
+    g = ['<g class="rsz" data-sec="' + k + '" transform="translate(' + (W - PADR - 3) + "," + (sec.y + sec.h - 3) + ')">',
+         '<title>Drag to resize</title><rect x="-16" y="-16" width="20" height="20" fill="transparent"/>'];
+    for (gl = 0; gl < 3; gl++) {
+      o = 3 + gl * 4;
       g.push('<line x1="' + (-o) + '" y1="1" x2="1" y2="' + (-o) + '" stroke="#9aa5b1" stroke-width="1.6"/>');
+    }
+    s.push(g.join("") + "</g>");
+    /* reorder handle in the left margin */
+    g = ['<g class="drag' + (dragging && dragging.key === k ? " on" : "") + '" data-sec="' + k +
+         '" transform="translate(14,' + (sec.y + sec.h / 2) + ')">',
+         '<title>Drag to reorder this chart</title><rect x="-8" y="-20" width="24" height="40" fill="transparent"/>'];
+    for (r = 0; r < 3; r++) for (c = 0; c < 2; c++) {
+      g.push('<circle cx="' + (c * 7) + '" cy="' + (r * 7 - 7) + '" r="1.7" fill="#aeb6c0"/>');
     }
     s.push(g.join("") + "</g>");
   });
@@ -565,7 +747,7 @@ function legend(s, sec, items) {
 function bindPointer() {
   var svg = $("wx"), tip = $("tip"), xh = $("xh"), box = $("chartbox");
   function move(ev) {
-    if (resizing) return;                     /* no tooltip while dragging a grip */
+    if (resizing || dragging) return;         /* no tooltip while dragging a grip or reordering */
     var r = svg.getBoundingClientRect();
     var px = ev.clientX - r.left, py = ev.clientY - r.top;
     if (px < PADL - 4 || px > W - PADR + 4 || py < SEC.days.h || py > BOTTOM) { hide(); return; }
@@ -579,7 +761,13 @@ function bindPointer() {
       " · gusts " + Math.round(data.wgst[i]) + "<br>" +
       "☁️ " + Math.round(data.cloud[i]) + "%" +
       (data.prob[i] !== null ? " · precip chance " + Math.round(data.prob[i]) + "%" : "") + "<br>" +
-      "💧 Accum " + fmtIn(data.accum[i]) + " in";
+      (data.vis[i] !== null ? "👁 visibility " + (data.vis[i] >= 10 ? "10+ mi" : data.vis[i].toFixed(1) + " mi") +
+        (data.vis[i] < 1 ? " (fog)" : "") + "<br>" : "") +
+      "💧 Accum " + fmtIn(data.accum[i]) + " in" +
+      (data.tide && data.tide.h[i] !== null ? "<br>🌊 tide " + data.tide.h[i].toFixed(1) + " ft" +
+        (data.tide.cur && data.tide.cur.v && data.tide.cur.v[i] !== null && data.tide.cur.v[i] !== undefined ?
+          " · current " + Math.abs(data.tide.cur.v[i]).toFixed(1) + " kn " +
+          (data.tide.cur.v[i] >= 0 ? "flood" : "ebb") : "") : "");
     if (showHrrr && data.hrrr.wspd[i] !== null) {
       html += '<br><span class="hrrr">HRRR: ' + Math.round(data.hrrr.wspd[i]) + " mph from " +
               compass(data.hrrr.wdir[i]) + " · " + Math.round(data.hrrr.temp[i]) + "° · cloud " +
@@ -596,6 +784,14 @@ function bindPointer() {
   function hide() { tip.style.display = "none"; xh.setAttribute("opacity", "0"); }
   svg.addEventListener("pointermove", move);
   svg.addEventListener("pointerdown", function (ev) {
+    var g = ev.target.closest ? ev.target.closest(".drag") : null;
+    if (g) {                                  /* reorder handle */
+      ev.preventDefault();
+      dragging = { key: g.getAttribute("data-sec") };
+      g.setAttribute("class", "drag on");     /* no re-render needed just to show the grab state */
+      hide();
+      return;
+    }
     var h = ev.target.closest ? ev.target.closest(".rsz") : null;
     if (!h) { move(ev); return; }
     ev.preventDefault();
@@ -604,17 +800,38 @@ function bindPointer() {
     hide();
   });
   svg.addEventListener("dblclick", function (ev) {  /* double-click a grip: back to defaults */
-    if (ev.target.closest && ev.target.closest(".rsz")) {
+    if (!ev.target.closest) return;
+    if (ev.target.closest(".rsz")) {
       Object.keys(DEFSIZE).forEach(function (k) { sizes[k] = DEFSIZE[k]; });
       save("bw_sizes", sizes); render();
+    } else if (ev.target.closest(".drag")) {        /* double-click a handle: default order */
+      order = DEFORDER.slice();
+      save("bw_order", order); render();
     }
   });
   svg.addEventListener("pointerleave", hide);
 }
 
-/* ---------- chart resize drag (window-level so re-renders mid-drag don't drop it) ---------- */
-var resizing = null, resizeRaf = 0;
+/* ---------- resize + reorder drags (window-level so re-renders mid-drag don't drop them) ---------- */
+var resizing = null, dragging = null, resizeRaf = 0;
 window.addEventListener("pointermove", function (ev) {
+  if (dragging) {                             /* reorder: swap when the pointer enters another row */
+    var svg = $("wx");
+    if (!svg) return;
+    var py = ev.clientY - svg.getBoundingClientRect().top;
+    var list = rows(), from = list.indexOf(dragging.key), to = -1;
+    for (var i = 0; i < list.length; i++) {
+      var sec = SEC[list[i]];
+      if (py >= sec.y && py <= sec.y + sec.h) { to = i; break; }
+    }
+    if (to >= 0 && to !== from) {
+      var target = list[to];
+      order.splice(order.indexOf(dragging.key), 1);
+      order.splice(order.indexOf(target) + (to > from ? 1 : 0), 0, dragging.key);
+      render();
+    }
+    return;
+  }
   if (!resizing) return;
   sizes[resizing.sec] = Math.round(Math.max(DEFSIZE[resizing.sec], resizing.h0 + (ev.clientY - resizing.y0)));
   if (!resizeRaf) resizeRaf = requestAnimationFrame(function () { resizeRaf = 0; render(); });
@@ -624,6 +841,7 @@ window.addEventListener("resize", function () {  /* browser resized: refit chart
 });
 window.addEventListener("pointerup", function () {
   if (resizing) { resizing = null; save("bw_sizes", sizes); }
+  if (dragging) { dragging = null; save("bw_order", order); render(); }
 });
 
 /* ---------- location search + recents ---------- */
