@@ -58,7 +58,7 @@
   #results div:hover, #results div.sel { background: #eaf3fc; }
   #results .none { color: #999; cursor: default; }
 
-  #recents { display: flex; flex-wrap: wrap; gap: 6px; }
+  #recents { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
   /* narrow screens: stack the header (must sit AFTER the base header rules to win the cascade) */
   @media (max-width: 900px) {
     header { grid-template-columns: 1fr; }
