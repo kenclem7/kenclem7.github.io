@@ -59,7 +59,7 @@ Everything else (DAYSN = HOURS/24) derives at runtime. The two pages share all l
 
 ## 5. Forecast page anatomy (weather10 / weather3)
 
-**Header row:** title block · current-conditions card (bordered, centered: big temp, icon with day/night variants, condition, feels-like + wind + gusts, next sun event as "sunset 8:21pm" / "sunrise 6:06am") · search box with **Use Map** button and cross-links below.
+**Header row:** CSS grid `1fr auto 1fr` so the current-conditions card sits on the true page centerline (title left, search right; under 900px it stacks to one column). The card: bordered, big temp, icon with day/night variants, condition, feels-like + wind + gusts, next sun event as "sunset 8:21pm" / "sunrise 6:06am". Search box has the **Use Map** button beside it and cross-links below. Cascade note: the narrow-screen @media block must stay AFTER the base header rules or it loses the tie.
 
 **Location entry, three ways:**
 1. Search box: Open-Meteo geocoding, dropdown, Enter picks first.

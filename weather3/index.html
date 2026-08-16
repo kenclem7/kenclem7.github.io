@@ -12,9 +12,11 @@
   .page { margin: 0 auto; padding: 14px 20px 30px; }   /* full browser width, 20px side margins */
   .card { background: #fff; border: 1px solid #dde2e8; border-radius: 8px; padding: 16px 16px 8px; }
 
-  header { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: flex-start; margin-bottom: 6px; }
-  .titleblock { flex: 1 1 300px; min-width: 260px; }
-  #nowbox { flex: 1 1 auto; display: none; align-items: center; justify-content: center; margin: 0 8px; }
+  /* grid with equal 1fr side columns puts the conditions card on the true page centerline */
+  header { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px 18px; align-items: start; margin-bottom: 6px; }
+  .titleblock { grid-column: 1; min-width: 0; }
+  #nowbox { grid-column: 2; display: none; align-items: center; justify-content: center; }
+  #recents, header .toggle { grid-column: 1 / -1; }
   .nowcard { display: flex; align-items: center; gap: 12px; border: 1px solid #d7dde3; border-radius: 10px;
              padding: 8px 16px; background: #f8fafc; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
   #nowbox .nicon { font-size: 40px; line-height: 1; }
@@ -25,7 +27,7 @@
   #locmeta { font-size: 12px; color: #777; margin-top: 3px; }
   #locmeta button { border: none; background: none; color: #1976d2; cursor: pointer; font-size: 13px; padding: 0 2px; }
 
-  .searchwrap { position: relative; flex: 0 1 345px; min-width: 250px; }
+  .searchwrap { grid-column: 3; justify-self: end; position: relative; width: 345px; max-width: 100%; }
   .searchrow { display: flex; gap: 8px; }
   #q { flex: 1; min-width: 0; padding: 8px 10px; font-size: 14px; border: 1px solid #c5ccd4; border-radius: 6px; outline: none; }
   #q:focus { border-color: #1976d2; }
@@ -55,7 +57,14 @@
   #results div:hover, #results div.sel { background: #eaf3fc; }
   #results .none { color: #999; cursor: default; }
 
-  #recents { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+  #recents { display: flex; flex-wrap: wrap; gap: 6px; }
+  /* narrow screens: stack the header (must sit AFTER the base header rules to win the cascade) */
+  @media (max-width: 900px) {
+    header { grid-template-columns: 1fr; }
+    .titleblock, #nowbox, .searchwrap { grid-column: 1; }
+    #nowbox { justify-content: center; }
+    .searchwrap { justify-self: stretch; width: 100%; }
+  }
   .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; background: #f1f3f6; border: 1px solid #d7dde3;
           border-radius: 14px; padding: 4px 8px 4px 11px; cursor: pointer; user-select: none; }
   .chip.active { background: #e3f0fb; border-color: #90bfe8; color: #0d5ba1; font-weight: 600; }
