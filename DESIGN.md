@@ -39,6 +39,7 @@ The whole site is robots-blocked (`robots.txt` Disallow all + `noindex` meta on 
 | Open-Meteo geocoding API | Location search box | same |
 | NOAA CO-OPS (tidesandcurrents.noaa.gov) | Tide predictions (hourly + high/low events) and current predictions | US government work, public domain, CORS-enabled. No key. |
 | OpenStreetMap tiles + Leaflet 1.9.4 (unpkg CDN) + Nominatim reverse geocoding | "Use Map" location picker | Free, no key, no account. OSM attribution shown on the map. Leaflet lazy-loads on first open. |
+| BigDataCloud reverse-geocode-client | Naming water clicks on the map (body of water + state when available) | Free client API, no key, CORS-enabled. Only called when Nominatim finds no locality. |
 
 ## 4. The two forecast pages share one source
 
