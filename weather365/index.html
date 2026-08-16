@@ -120,6 +120,14 @@ var DEFAULT_LOC = { name: "Kirkland", admin1: "Washington", cc: "US", lat: 47.68
 
 /* ---------- state ---------- */
 var loc = load("bw2_current") || DEFAULT_LOC;
+(function () {                                       /* a shared link opens on its own location */
+  var q = new URLSearchParams(location.search);
+  if (q.get("lat") && q.get("lon")) {
+    loc = { name: q.get("name") || "Shared spot", admin1: q.get("admin1") || "", cc: q.get("cc") || "",
+            lat: +q.get("lat"), lon: +q.get("lon") };
+    if (q.get("elev")) loc.elev = +q.get("elev");
+  }
+})();
 var recents = load("bw_recents") || [DEFAULT_LOC];   /* shared with the forecast pages */
 var data = null;                                     /* {hi[365], lo[365], p[365], mtot[12], fetched} */
 var fetchToken = 0;
@@ -128,6 +136,26 @@ function load(k) { try { var v = localStorage.getItem(k); return v === null ? nu
 function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 function $(id) { return document.getElementById(id); }
 function setLoading(on) { $("chartbox").className = "chartbox" + (on ? " loading" : ""); }
+/* share: a link that reopens this page on the location being viewed */
+function shareUrl() {
+  var p = "?lat=" + loc.lat + "&lon=" + loc.lon + "&name=" + encodeURIComponent(loc.name);
+  if (loc.admin1) p += "&admin1=" + encodeURIComponent(loc.admin1);
+  if (loc.cc) p += "&cc=" + encodeURIComponent(loc.cc);
+  if (loc.elev !== undefined && loc.elev !== null) p += "&elev=" + loc.elev;
+  return location.origin + location.pathname + p;
+}
+function share() {
+  var url = shareUrl(), btn = $("sharebtn");
+  function flash(msg) {
+    if (!btn) return;
+    btn.textContent = msg;
+    setTimeout(function () { btn.textContent = "share"; }, 1800);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(function () { flash("link copied"); },
+                                           function () { window.prompt("Copy this link:", url); });
+  } else window.prompt("Copy this link:", url);
+}
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 
 /* ---------- helpers ---------- */
@@ -351,6 +379,7 @@ function render() {
   var lonW = Math.abs(loc.lon).toFixed(2) + "°" + (loc.lon >= 0 ? "E" : "W");
   var elev = loc.elev !== undefined && loc.elev !== null ? " · Elev " + Math.round(loc.elev * 3.28084) + " ft" : "";
   $("locmeta").innerHTML = latN + ", " + lonW + elev +
+    ' · <button id="sharebtn" title="Copy a link to this view" onclick="share()">share</button>' +
     ' · <button title="Re-fetch" onclick="loadAverages(true)">⟳ refresh</button>';
   renderRecents();
   var scr = document.querySelector(".scroller");

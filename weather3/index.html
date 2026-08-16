@@ -142,6 +142,14 @@ var WD = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
 /* ---------- state ---------- */
 var loc = load("bw_current") || DEFAULT_LOC;
+(function () {                               /* a shared link opens on its own location */
+  var q = new URLSearchParams(location.search);
+  if (q.get("lat") && q.get("lon")) {
+    loc = { name: q.get("name") || "Shared spot", admin1: q.get("admin1") || "", cc: q.get("cc") || "",
+            lat: +q.get("lat"), lon: +q.get("lon") };
+    if (q.get("elev")) loc.elev = +q.get("elev");
+  }
+})();
 var recents = load("bw_recents") || [DEFAULT_LOC];
 var showHrrr = load("bw_hrrr");
 if (showHrrr === null) showHrrr = true;
@@ -152,6 +160,26 @@ function load(k) { try { var v = localStorage.getItem(k); return v === null ? nu
 function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 function $(id) { return document.getElementById(id); }
 function setLoading(on) { $("chartbox").className = "chartbox" + (on ? " loading" : ""); }
+/* share: a link that reopens this page on the location being viewed */
+function shareUrl() {
+  var p = "?lat=" + loc.lat + "&lon=" + loc.lon + "&name=" + encodeURIComponent(loc.name);
+  if (loc.admin1) p += "&admin1=" + encodeURIComponent(loc.admin1);
+  if (loc.cc) p += "&cc=" + encodeURIComponent(loc.cc);
+  if (loc.elev !== undefined && loc.elev !== null) p += "&elev=" + loc.elev;
+  return location.origin + location.pathname + p;
+}
+function share() {
+  var url = shareUrl(), btn = $("sharebtn");
+  function flash(msg) {
+    if (!btn) return;
+    btn.textContent = msg;
+    setTimeout(function () { btn.textContent = "share"; }, 1800);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(function () { flash("link copied"); },
+                                           function () { window.prompt("Copy this link:", url); });
+  } else window.prompt("Copy this link:", url);
+}
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 
 /* ---------- helpers ---------- */
@@ -500,7 +528,8 @@ function render() {
   var elev = loc.elev !== undefined && loc.elev !== null ? " · Elev " + Math.round(loc.elev * 3.28084) + " ft" : "";
   $("locmeta").innerHTML = latN + ", " + lonW + elev + " · updated " +
     data.fetched.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) +
-    ' <button title="Refresh" onclick="loadForecast()">⟳ refresh</button>';
+    ' · <button id="sharebtn" title="Copy a link to this view" onclick="share()">share</button>' +
+    ' · <button title="Refresh" onclick="loadForecast()">⟳ refresh</button>';
   renderRecents();
   /* rendering can add/remove the page scrollbar, changing the available width; refit once */
   var scr = document.querySelector(".scroller");
