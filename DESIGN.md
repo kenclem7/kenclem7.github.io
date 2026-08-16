@@ -66,7 +66,7 @@ Everything else (DAYSN = HOURS/24) derives at runtime. The two pages share all l
 2. **Use Map**: modal with OSM map, click drops a pin, Nominatim names it (coordinates stand in over open water), "Use this location".
 3. Share links: `?lat&lon&name&admin1&cc&elev` params override the saved city without touching it. The **share** button (locmeta row, left of refresh) copies such a link for the current view.
 
-Recents are chips (max 8), shared across all three pages via `bw_recents`.
+Recents are a pull-down under the search row (#recwrap, exactly the width of input + Use Map): the button shows the active city with a caret, the menu lists up to 8 recents (active row highlighted, per-row × remove), shared across all three pages via `bw_recents`. Outside click or Escape closes it.
 
 **Day strip:** date + hi/lo (14px), icon emoji, condition, precip, sunrise/sunset row ("↑6:05am  ↓8:21pm", non-breaking spaces, amber #c08a12). Strip height 136.
 

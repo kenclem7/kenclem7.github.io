@@ -51,13 +51,20 @@
   #results div:hover, #results div.sel { background: #eaf3fc; }
   #results .none { color: #999; cursor: default; }
 
-  #recents { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; justify-content: flex-end; }
-  .chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; background: #f1f3f6; border: 1px solid #d7dde3;
-          border-radius: 14px; padding: 4px 8px 4px 11px; cursor: pointer; user-select: none; }
-  .chip.active { background: #e3f0fb; border-color: #90bfe8; color: #0d5ba1; font-weight: 600; }
-  .chip b { font-weight: inherit; }
-  .chip span { color: #98a2ad; font-size: 13px; line-height: 1; padding: 1px 3px; border-radius: 8px; }
-  .chip span:hover { background: #d9dee4; color: #555; }
+  #recwrap { position: relative; margin-top: 8px; }
+  #recbtn { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px;
+            font-size: 14px; border: 1px solid #c5ccd4; border-radius: 6px; background: #fff; cursor: pointer; }
+  #recbtn:hover { border-color: #1976d2; }
+  #recbtn .caret { color: #8a939c; font-size: 12px; }
+  #recmenu { position: absolute; top: 100%; left: 0; right: 0; z-index: 29; background: #fff; border: 1px solid #c5ccd4;
+             border-radius: 0 0 6px 6px; box-shadow: 0 6px 16px rgba(0,0,0,.12); max-height: 260px; overflow-y: auto; }
+  #recmenu .row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; font-size: 13.5px; cursor: pointer; }
+  #recmenu .row:hover { background: #eaf3fc; }
+  #recmenu .row.active { color: #0d5ba1; font-weight: 600; background: #f2f8fd; }
+  #recmenu .row b { font-weight: inherit; flex: 1; }
+  #recmenu .row .sub { color: #98a2ad; font-size: 12px; }
+  #recmenu .row .rm { color: #98a2ad; font-size: 14px; line-height: 1; padding: 1px 4px; border-radius: 8px; }
+  #recmenu .row .rm:hover { background: #d9dee4; color: #555; }
 
   #status { font-size: 13px; color: #888; padding: 8px 2px; min-height: 20px; }
   #status .err { color: #c0392b; }
@@ -97,8 +104,11 @@
           <button class="mapbtn" onclick="openMap()">Use Map</button>
         </div>
         <div id="results" style="display:none"></div>
+        <div id="recwrap">
+          <button id="recbtn" onclick="toggleRecents()" title="Recent locations"><span id="recbtnlabel"></span><span class="caret">▾</span></button>
+          <div id="recmenu" hidden></div>
+        </div>
       </div>
-      <div id="recents"></div>
     </header>
     <div id="status"></div>
     <div class="scroller">
@@ -540,18 +550,35 @@ document.addEventListener("keydown", function (e) { if (e.key === "Escape") clos
 
 /* ---------- location search + recents (same behavior as the forecast pages) ---------- */
 function renderRecents() {
-  var host = $("recents"); host.innerHTML = "";
+  $("recbtnlabel").textContent = locLabel(loc, true);
+  $("recwrap").style.display = recents.length ? "" : "none";
+  var host = $("recmenu"); host.innerHTML = "";
   recents.forEach(function (r, idx) {
-    var c = document.createElement("div");
-    c.className = "chip" + (sameLoc(r, loc) ? " active" : "");
-    var b = document.createElement("b"); b.textContent = locLabel(r, true); c.appendChild(b);
-    var xd = document.createElement("span"); xd.textContent = "×"; xd.title = "Remove";
-    xd.addEventListener("click", function (ev) { ev.stopPropagation(); recents.splice(idx, 1); save("bw_recents", recents); renderRecents(); });
-    c.appendChild(xd);
-    c.addEventListener("click", function () { selectLoc(r); });
-    host.appendChild(c);
+    var row = document.createElement("div");
+    row.className = "row" + (sameLoc(r, loc) ? " active" : "");
+    row.title = locLabel(r);
+    var b = document.createElement("b"); b.textContent = locLabel(r, true); row.appendChild(b);
+    if (r.admin1) { var sub = document.createElement("span"); sub.className = "sub"; sub.textContent = r.admin1; row.appendChild(sub); }
+    var rm = document.createElement("span"); rm.className = "rm"; rm.textContent = "×"; rm.title = "Remove";
+    rm.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      recents.splice(idx, 1); save("bw_recents", recents); renderRecents();
+    });
+    row.appendChild(rm);
+    row.addEventListener("click", function () {
+      $("recmenu").hidden = true;
+      if (!sameLoc(r, loc)) selectLoc(r);
+    });
+    host.appendChild(row);
   });
 }
+function toggleRecents() { $("recmenu").hidden = !$("recmenu").hidden; }
+document.addEventListener("click", function (ev) {
+  if (!(ev.target.closest && ev.target.closest("#recwrap"))) { var rm = $("recmenu"); if (rm) rm.hidden = true; }
+});
+document.addEventListener("keydown", function (ev) {
+  if (ev.key === "Escape") { var rm = $("recmenu"); if (rm) rm.hidden = true; }
+});
 function selectLoc(l) {
   loc = l;
   save("bw2_current", loc);
