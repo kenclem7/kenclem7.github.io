@@ -16,7 +16,7 @@ Personal weather site for Ken Clements. Built August 2026. This document is the 
 | kenclements.com | Redirects to Ken's LinkedIn profile | `index.html` |
 | /weather, /weather1, /weather2 | Redirect stubs to the pages above (old names) | `weather/`, `weather1/`, `weather2/` |
 
-Cross-links sit under the search bar on every page ("3 Day Forecast", "10 Day Forecast", "Historical"). Naming rule: always "N Day Forecast", never hyphenated "N-day", anywhere on the site.
+Page navigation (#pagenav) sits under the GPS-coordinates line on every page: all three options always show, in order "3 Day Forecast · 10 Day Forecast · Historical", with the current page greyed out (span.here) and the other two as links. Naming rule: always "N Day Forecast", never hyphenated "N-day", anywhere on the site.
 
 The whole site is robots-blocked (`robots.txt` Disallow all + `noindex` meta on every page). Browser tab identity: "City · Weather Chart" (forecast pages) and "City · Average Year" (historical).
 
@@ -50,8 +50,8 @@ s = open('weather10/index.html', encoding='utf-8').read()
 s = s.replace('HOURS = 240', 'HOURS = 72')
 s = s.replace('forecast_days: 10', 'forecast_days: 3')
 s = s.replace('10 Day Weather Forecast', '3 Day Weather Forecast')
-s = s.replace('<a href="/weather3/">3 Day Forecast</a><a href="/weather365/">Historical</a>',
-              '<a href="/weather10/">10 Day Forecast</a><a href="/weather365/">Historical</a>')
+s = s.replace('<a href="/weather3/">3 Day Forecast</a><span class="here">10 Day Forecast</span>',
+              '<span class="here">3 Day Forecast</span><a href="/weather10/">10 Day Forecast</a>')
 open('weather3/index.html', 'w', encoding='utf-8', newline='').write(s)
 ```
 
@@ -59,7 +59,7 @@ Everything else (DAYSN = HOURS/24) derives at runtime. The two pages share all l
 
 ## 5. Forecast page anatomy (weather10 / weather3)
 
-**Header row:** CSS grid `1fr auto 1fr` so the current-conditions card sits on the true page centerline (title left, search right; under 900px it stacks to one column). The card: bordered, big temp, icon with day/night variants, condition, feels-like + wind + gusts, next sun event as "sunset 8:21pm" / "sunrise 6:06am". Search box has the **Use Map** button beside it and cross-links below. Cascade note: the narrow-screen @media block must stay AFTER the base header rules or it loses the tie.
+**Header row:** CSS grid `1fr auto 1fr` so the current-conditions card sits on the true page centerline (title left, search right; under 900px it stacks to one column). The card: bordered, big temp, icon with day/night variants, condition, feels-like + wind + gusts, next sun event as "sunset 8:21pm" / "sunrise 6:06am". Search box has the **Use Map** button beside it; the page-nav row lives under the coordinates line in the title block. Cascade note: the narrow-screen @media block must stay AFTER the base header rules or it loses the tie.
 
 **Location entry, three ways:**
 1. Search box: Open-Meteo geocoding, dropdown, Enter picks first.
