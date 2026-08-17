@@ -48,10 +48,11 @@
   .mapfoot .use { padding: 8px 14px; font-size: 14px; border: 1px solid #1976d2; background: #1976d2; color: #fff;
                   border-radius: 6px; cursor: pointer; }
   .mapfoot .use[disabled] { opacity: .4; cursor: default; }
-  #pagenav { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 7px; font-size: 14px; font-weight: 700; }
-  #pagenav a { color: #1976d2; text-decoration: none; }
-  #pagenav a:hover { text-decoration: underline; }
-  #pagenav .here { color: #b3bbc3; cursor: default; }
+  #pagenav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  #pagenav a, #pagenav .here { padding: 8px 12px; font-size: 14px; font-weight: 600; border-radius: 6px; white-space: nowrap; }
+  #pagenav a { color: #1976d2; text-decoration: none; border: 1px solid #c5ccd4; background: #fff; }
+  #pagenav a:hover { border-color: #1976d2; background: #f4f9fe; }
+  #pagenav .here { color: #9aa3ac; background: #eef1f4; border: 1px solid #e2e7ec; cursor: default; }
   #results { position: absolute; top: 100%; left: 0; right: 0; z-index: 30; background: #fff; border: 1px solid #c5ccd4;
              border-radius: 0 0 6px 6px; box-shadow: 0 6px 16px rgba(0,0,0,.12); max-height: 240px; overflow-y: auto; }
   #results div { padding: 8px 10px; font-size: 13px; cursor: pointer; }
