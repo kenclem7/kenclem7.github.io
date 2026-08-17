@@ -924,7 +924,7 @@ function updateSticky() {
   sh.style.display = "block";
   sh.style.left = sr.left + "px";
   sh.style.width = sr.width + "px";
-  sh.style.height = (SEC.days.h + 1) + "px";
+  sh.style.height = "24px";                   /* just the date row of the strip, nothing below it */
   $("stickyinner").style.marginLeft = (-sc.scrollLeft) + "px";
 }
 window.addEventListener("scroll", updateSticky, { passive: true });

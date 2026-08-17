@@ -86,7 +86,7 @@ Recents are a pull-down under the search row (#recwrap, exactly the width of inp
 
 Station lookup uses `data/tide-stations.json` and `data/current-stations.json`: pre-trimmed copies of NOAA's station metadata (340KB total vs NOAA's 5.6MB). Regenerate occasionally from `api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=tidepredictions|currentpredictions` keeping `[id,name,lat,lng]` / `[id,bin,name,lat,lng]`.
 
-**Sticky date header:** scrolling past the day strip pins a cloned copy of it to the top of the viewport (#stickyhead: fixed, clipped to SEC.days.h, ids stripped from the clone, pointer-events none), sized/positioned to the scroller and horizontally synced to its scrollLeft; hides again near the top or past the charts. The clone is rebuilt after each render except mid-drag (would jank).
+**Sticky date header:** scrolling past the day strip pins ONLY the date row to the top of the viewport (#stickyhead: fixed, a full clone of the chart clipped to 24px so just the date line shows; ids stripped from the clone, pointer-events none), sized/positioned to the scroller and horizontally synced to its scrollLeft; hides again near the top or past the charts. The clone is rebuilt after each render except mid-drag (would jank).
 
 **Chart chrome:** night shading (dusk to dawn, #dce6f2 at .35) instead of alternating day bands; darker day-boundary lines #aeb6c0 running continuously from the day strip through every chart and the gaps between them (no top rule - tried and rejected); black "now" line; orange crosshair + 19px tooltip showing every row's value for the hovered hour (sun times, temp, wind, cloud/chance, visibility incl. "(fog)", accum, tide + current).
 
