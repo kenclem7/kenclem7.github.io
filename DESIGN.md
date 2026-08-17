@@ -86,7 +86,7 @@ Recents are a pull-down under the search row (#recwrap, exactly the width of inp
 
 Station lookup uses `data/tide-stations.json` and `data/current-stations.json`: pre-trimmed copies of NOAA's station metadata (340KB total vs NOAA's 5.6MB). Regenerate occasionally from `api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=tidepredictions|currentpredictions` keeping `[id,name,lat,lng]` / `[id,bin,name,lat,lng]`.
 
-**Chart chrome:** night shading (dusk to dawn, #dce6f2 at .35) instead of alternating day bands; darker day-boundary lines #aeb6c0 plus a matching horizontal rule capping the top of the day strip; black "now" line; orange crosshair + 19px tooltip showing every row's value for the hovered hour (sun times, temp, wind, cloud/chance, visibility incl. "(fog)", accum, tide + current).
+**Chart chrome:** night shading (dusk to dawn, #dce6f2 at .35) instead of alternating day bands; darker day-boundary lines #aeb6c0 (no top rule - tried and rejected); black "now" line; orange crosshair + 19px tooltip showing every row's value for the hovered hour (sun times, temp, wind, cloud/chance, visibility incl. "(fog)", accum, tide + current).
 
 **User layout controls (persisted per device):**
 - **Reorder:** each row has a 13px black uppercase title + dot handle in the left margin (PADL 64). Drag by title or dots; the handle rides the pointer, the in-flight row is tinted blue with a dashed outline, others slide aside live. Double-click a handle: default order.
