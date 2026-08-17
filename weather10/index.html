@@ -15,7 +15,8 @@
   /* grid with equal 1fr side columns puts the conditions card on the true page centerline */
   header { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px 18px; align-items: end; margin-bottom: 6px; }
   .titleblock { grid-column: 1; min-width: 0; }
-  #nowbox { grid-column: 2; display: none; align-items: center; justify-content: center; }
+  #nowbox { grid-column: 2; display: none; align-items: center; justify-content: center;
+            transform: translateX(26px); }   /* page center -> chart plot center: (PADL - PADR) / 2 */
   header .toggle { grid-column: 1 / -1; }
   .nowcard .nowlabel { writing-mode: vertical-rl; transform: rotate(180deg); align-self: stretch; text-align: center;
                        font-size: 13px; font-weight: 600; letter-spacing: 0.8px; color: #111; }
