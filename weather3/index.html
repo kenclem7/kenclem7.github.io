@@ -596,11 +596,10 @@ function render() {
 
   /* day boundary lines only - no alternating fill, the night shading owns the background */
   var plotSecs = rows().map(function (k) { return SEC[k]; });
-  [SEC.days].concat(plotSecs).forEach(function (sec) {
-    for (var l = 0; l <= DAYSN; l++) {
-      s.push('<line x1="' + xb(l * 24) + '" y1="' + sec.y + '" x2="' + xb(l * 24) + '" y2="' + (sec.y + sec.h) + '" stroke="' + COL.dayline + '" stroke-width="1.3"/>');
-    }
-  });
+  /* day boundary lines run continuously from the strip through every chart and the gaps between them */
+  for (var l = 0; l <= DAYSN; l++) {
+    s.push('<line x1="' + xb(l * 24) + '" y1="0" x2="' + xb(l * 24) + '" y2="' + BOTTOM + '" stroke="' + COL.dayline + '" stroke-width="1.3"/>');
+  }
 
   /* night shading: dusk-to-dawn tint across the chart sections */
   plotSecs.forEach(function (sec) {
