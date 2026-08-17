@@ -199,8 +199,8 @@ function applyLayout() {
      leave a sub-pixel overflow that renders a useless scrollbar */
   W = Math.max(1080, (scr ? scr.clientWidth : 0) - 2);
   PLOTW = W - PADL - PADR;
-  var GAP = 58, y = 136;                     /* gap holds each chart's legend row */
-  SEC = { days: { y: 0, h: 136 } };          /* first row sits flush against the day strip */
+  var GAP = 58, y = 144;                     /* gap holds each chart's legend row */
+  SEC = { days: { y: 0, h: 144 } };          /* first row sits flush against the day strip */
   rows().forEach(function (k, i) {
     if (i) y += GAP;
     SEC[k] = { y: y, h: sizes[k] };
@@ -621,17 +621,17 @@ function render() {
   /* ---- day strip ---- */
   for (d = 0; d < data.days.length; d++) {
     var dy = data.days[d], cx = xb(d * 24) + PLOTW / (DAYSN * 2);
-    /* spelled-out date when the column is wide enough for it (~7.5px per character at 14px/600) */
-    var dlabel = dy.labelLong && (PLOTW / DAYSN) >= dy.labelLong.length * 7.5 + 10 ? dy.labelLong : dy.label;
-    s.push('<text x="' + cx + '" y="18" text-anchor="middle" font-size="14" font-weight="600" fill="#333">' + dlabel + "</text>");
-    s.push('<text x="' + cx + '" y="38" text-anchor="middle" font-size="14"><tspan fill="' + COL.temp + '" font-weight="600">' +
+    /* spelled-out date when the column is wide enough for it (~9.7px per character at 18px/600) */
+    var dlabel = dy.labelLong && (PLOTW / DAYSN) >= dy.labelLong.length * 9.7 + 10 ? dy.labelLong : dy.label;
+    s.push('<text x="' + cx + '" y="23" text-anchor="middle" font-size="18" font-weight="600" fill="#333">' + dlabel + "</text>");
+    s.push('<text x="' + cx + '" y="46" text-anchor="middle" font-size="14"><tspan fill="' + COL.temp + '" font-weight="600">' +
            Math.round(dy.hi) + "°</tspan><tspan fill=\"#999\"> | " + Math.round(dy.lo) + "°</tspan></text>");
-    s.push('<text x="' + cx + '" y="72" text-anchor="middle" font-size="28">' + dy.icon + "</text>");
-    s.push('<text x="' + cx + '" y="93" text-anchor="middle" font-size="12" fill="#666">' + dy.cond + "</text>");
+    s.push('<text x="' + cx + '" y="80" text-anchor="middle" font-size="28">' + dy.icon + "</text>");
+    s.push('<text x="' + cx + '" y="101" text-anchor="middle" font-size="12" fill="#666">' + dy.cond + "</text>");
     var wet = dy.psum >= 0.005;
-    s.push('<text x="' + cx + '" y="111" text-anchor="middle" font-size="12" fill="' + (wet ? "#1976d2" : "#9aa3ac") + '">' +
+    s.push('<text x="' + cx + '" y="119" text-anchor="middle" font-size="12" fill="' + (wet ? "#1976d2" : "#9aa3ac") + '">' +
            (wet ? "💧 " : "") + (wet ? fmtIn(dy.psum) : "0") + " in</text>");
-    if (dy.srS) s.push('<text x="' + cx + '" y="128" text-anchor="middle" font-size="11.5" fill="#e07408"><tspan font-weight="700">↑</tspan>' +
+    if (dy.srS) s.push('<text x="' + cx + '" y="136" text-anchor="middle" font-size="11.5" fill="#e07408"><tspan font-weight="700">↑</tspan>' +
                        dy.srS + "am  " + '<tspan font-weight="700">↓</tspan>' + dy.ssS + "pm</text>");
   }
 
@@ -924,7 +924,7 @@ function updateSticky() {
   sh.style.display = "block";
   sh.style.left = sr.left + "px";
   sh.style.width = sr.width + "px";
-  sh.style.height = "24px";                   /* just the date row of the strip, nothing below it */
+  sh.style.height = "30px";                   /* just the date row of the strip, nothing below it */
   $("stickyinner").style.marginLeft = (-sc.scrollLeft) + "px";
 }
 window.addEventListener("scroll", updateSticky, { passive: true });
