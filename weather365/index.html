@@ -25,6 +25,8 @@
   .mapbtn { padding: 8px 12px; font-size: 14px; border: 1px solid #c5ccd4; border-radius: 6px;
             background: #fff; cursor: pointer; white-space: nowrap; }
   .mapbtn:hover { border-color: #1976d2; color: #1976d2; }
+  .mapbtn.gps { width: 34px; height: 34px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+                flex: 0 0 auto; color: #444; }
   #mapwrap { position: fixed; inset: 0; z-index: 60; background: rgba(20,28,36,.55); display: none;
              align-items: center; justify-content: center; padding: 20px; }
   #mapwrap.on { display: flex; }
@@ -103,6 +105,7 @@
         <div class="searchrow">
           <input id="q" type="text" placeholder="Add location (city or town)…" autocomplete="off" spellcheck="false">
           <button class="mapbtn" onclick="openMap()">Use Map</button>
+          <button class="mapbtn gps" onclick="useMyLocation()" title="Use my current location"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><line x1="12" y1="1" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="1" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="23" y2="12"/></svg></button>
         </div>
         <div id="results" style="display:none"></div>
         <div id="recwrap">
@@ -522,12 +525,13 @@ function closeMap() { $("mapwrap").className = ""; }
 function pickOnMap(lat, lon) {
   lat = Math.round(lat * 10000) / 10000;
   lon = Math.round(lon * 10000) / 10000;
-  lmark.setLatLng([lat, lon]);
+  if (lmark) lmark.setLatLng([lat, lon]);      /* the GPS button uses this path with the map closed */
   mapPick = { name: lat.toFixed(3) + ", " + lon.toFixed(3), admin1: "", cc: "", lat: lat, lon: lon };
   $("mapuse").disabled = false;
   var coords = lat.toFixed(3) + ", " + lon.toFixed(3);
   $("mapsel").innerHTML = "Selected <b>" + coords + "</b> · naming it…";
-  fetch("https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=12&lat=" + lat + "&lon=" + lon)
+  /* stored on mapPick.naming so the GPS button can await the full chain */
+  mapPick.naming = fetch("https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=12&lat=" + lat + "&lon=" + lon)
     .then(function (r) { return r.json(); })
     .then(function (j) {
       if (!mapPick || mapPick.lat !== lat || mapPick.lon !== lon) return;
@@ -591,6 +595,25 @@ function useMapPick() {
   if (!mapPick) return;
   closeMap();
   selectLoc(mapPick);
+}
+function useMyLocation() {
+  if (!navigator.geolocation) { setStatus('<span class="err">This browser cannot share its location.</span>'); return; }
+  setStatus("Finding your location…");
+  navigator.geolocation.getCurrentPosition(function (pos) {
+    var la = Math.round(pos.coords.latitude * 10000) / 10000;
+    var lo = Math.round(pos.coords.longitude * 10000) / 10000;
+    pickOnMap(la, lo);                         /* reuses the land/water naming chain */
+    var picked = mapPick;
+    var settle = function () {
+      if (mapPick === picked) mapPick = null;
+      delete picked.naming;                    /* promises do not belong in localStorage */
+      selectLoc(picked);
+    };
+    Promise.race([picked.naming || Promise.resolve(),
+                  new Promise(function (ok) { setTimeout(ok, 6000); })]).then(settle, settle);
+  }, function (err) {
+    setStatus('<span class="err">Could not get your location (' + esc(err.message) + ').</span>');
+  }, { enableHighAccuracy: false, timeout: 12000, maximumAge: 300000 });
 }
 document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeMap(); });
 
