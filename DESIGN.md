@@ -71,7 +71,7 @@ Everything else (DAYSN = HOURS/24) derives at runtime. The two pages share all l
 
 Recents are a pull-down under the search row (#recwrap, exactly the width of input + Use Map): the button shows the active city with a caret, the menu lists up to 8 recents (active row highlighted, per-row × remove), shared across all three pages via `bw_recents`. Outside click or Escape closes it.
 
-**Day strip:** date (18px/600 with a little padding above and below), hi/lo (14px), icon emoji, condition, precip, sunrise/sunset row ("↑6:05am  ↓8:21pm", non-breaking spaces, amber #c08a12). Strip height 144. The date spells out ("Sunday, August 16") whenever the day column is wide enough for it (~9.7px/char fit test at 18px) - always on the 3 Day page, on the 10 Day page only at very wide windows; otherwise the compact "Sun 8/16".
+**Day strip:** date (18px/600 with a little padding above and below), hi/lo (14px), icon emoji, condition, precip, sunrise/sunset row ("↑6:05am  ↓8:21pm", non-breaking spaces, amber #c08a12). Strip height 144 (160 in two-line mode). Dates ALWAYS spell out: one line ("Sunday, August 16") where the column fits it (~9.7px/char at 18px - the 3 Day page), otherwise two lines, 18px weekday over a 14px "August 16" (the 10 Day page; twoLineStrip flag computed in applyLayout, rows below shift +16, sticky ribbon 47px instead of 30). The compact "Sun 8/16" survives only in the tooltip.
 
 **Chart rows, default order:** TEMPERATURE, WIND, CLOUDS, VISIBILITY, PRECIP, TIDE.
 
