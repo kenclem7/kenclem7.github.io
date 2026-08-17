@@ -95,6 +95,9 @@
   #status button { margin-left: 8px; font-size: 12.5px; cursor: pointer; }
 
   .scroller { overflow-x: auto; }
+  #stickyhead { position: fixed; top: 0; display: none; overflow: hidden; z-index: 40; background: #fff;
+                border-bottom: 1px solid #c9cfd6; box-shadow: 0 3px 8px rgba(0,0,0,.10); }
+  #stickyhead svg { display: block; }
   .chartbox { position: relative; width: 1080px; }
   .chartbox.loading { min-height: 340px; }
   #loading { position: absolute; inset: 0; z-index: 25; display: none; align-items: center; justify-content: center;
@@ -146,6 +149,7 @@
       <label class="toggle"><input type="checkbox" id="hrrrToggle"> <span class="dash"></span> HRRR short-range overlay (next 2 days)</label>
     </header>
     <div id="status"></div>
+    <div id="stickyhead"><div id="stickyinner"></div></div>
     <div class="scroller">
       <div class="chartbox" id="chartbox">
         <div id="loading"><div class="spin"></div></div>
@@ -786,6 +790,7 @@ function render() {
   $("chart").innerHTML = s.join("");
 
   bindPointer();
+  if (!dragging && !resizing) buildSticky();  /* skip while dragging: cloning every frame would jank */
   $("title").textContent = locLabel(loc) + " 3 Day Weather Forecast";
   document.title = locLabel(loc, true) + " · Weather Chart";
   renderNow();
@@ -895,6 +900,38 @@ function bindPointer() {
   });
   svg.addEventListener("pointerleave", hide);
 }
+
+/* ---------- sticky date header: a clipped clone of the chart's day strip ---------- */
+function buildSticky() {
+  var src = $("wx"), host = $("stickyinner");
+  if (!src || !host) return;
+  host.innerHTML = "";
+  var c = src.cloneNode(true);
+  c.removeAttribute("id");                    /* no duplicate ids in the document */
+  var xh2 = c.querySelector("#xh");
+  if (xh2) xh2.removeAttribute("id");
+  c.style.pointerEvents = "none";
+  host.appendChild(c);
+  updateSticky();
+}
+function updateSticky() {
+  var sh = $("stickyhead"), sc = document.querySelector(".scroller"), box = $("chartbox");
+  if (!sh || !sc || !box || !data) return;
+  var r = box.getBoundingClientRect();
+  var show = r.top < -10 && r.bottom > 220;   /* strip scrolled off the top, charts still on screen */
+  if (!show) { sh.style.display = "none"; return; }
+  var sr = sc.getBoundingClientRect();
+  sh.style.display = "block";
+  sh.style.left = sr.left + "px";
+  sh.style.width = sr.width + "px";
+  sh.style.height = (SEC.days.h + 1) + "px";
+  $("stickyinner").style.marginLeft = (-sc.scrollLeft) + "px";
+}
+window.addEventListener("scroll", updateSticky, { passive: true });
+document.addEventListener("DOMContentLoaded", function () {
+  var sc = document.querySelector(".scroller");
+  if (sc) sc.addEventListener("scroll", updateSticky, { passive: true });
+});
 
 /* ---------- resize + reorder drags (window-level so re-renders mid-drag don't drop them) ---------- */
 var resizing = null, dragging = null, resizeRaf = 0;
