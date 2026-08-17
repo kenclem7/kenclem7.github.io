@@ -55,6 +55,7 @@
   #pagenav a { color: #1976d2; text-decoration: none; border: 1px solid #c5ccd4; background: #fff; }
   #pagenav a:hover { border-color: #1976d2; background: #f4f9fe; }
   #pagenav .here { color: #fff; background: #1976d2; border: 1px solid #1976d2; cursor: default; }
+  @media (max-width: 600px) { #pagenav .fc { display: none; } }   /* phones: "3 Day" / "10 Day" */
   #results { position: absolute; top: 100%; left: 0; right: 0; z-index: 30; background: #fff; border: 1px solid #c5ccd4;
              border-radius: 0 0 6px 6px; box-shadow: 0 6px 16px rgba(0,0,0,.12); max-height: 240px; overflow-y: auto; }
   #results div { padding: 8px 10px; font-size: 13px; cursor: pointer; }
@@ -123,7 +124,7 @@
       <div class="titleblock">
         <h1 id="title">10 Day Weather Forecast</h1>
         <div id="locmeta"></div>
-        <div id="pagenav"><a href="/weather3/">3 Day Forecast</a><span class="here">10 Day Forecast</span><a href="/weather365/">Historical</a></div>
+        <div id="pagenav"><a href="/weather3/">3 Day<span class="fc"> Forecast</span></a><span class="here">10 Day<span class="fc"> Forecast</span></span><a href="/weather365/">Historical</a></div>
       </div>
       <div id="nowbox"></div>
       <div class="searchwrap">

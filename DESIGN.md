@@ -16,7 +16,7 @@ Personal weather site for Ken Clements. Built August 2026. This document is the 
 | kenclements.com | Redirects to Ken's LinkedIn profile | `index.html` |
 | /weather, /weather1, /weather2 | Redirect stubs to the pages above (old names) | `weather/`, `weather1/`, `weather2/` |
 
-Page navigation (#pagenav) sits under the GPS-coordinates line on every page: all three options always show as 34px buttons, in order "3 Day Forecast · 10 Day Forecast · Historical". The current page (span.here) is the inverse of the other two: blue fill with white text, inert; the links are white with blue text. Naming rule: always "N Day Forecast", never hyphenated "N-day", anywhere on the site.
+Page navigation (#pagenav) sits under the GPS-coordinates line on every page: all three options always show as 34px buttons, in order "3 Day Forecast · 10 Day Forecast · Historical". The current page (span.here) is the inverse of the other two: blue fill with white text, inert; the links are white with blue text. On phones (under 600px) the forecast labels shorten to "3 Day" / "10 Day" (the word " Forecast" lives in a span.fc hidden by media query); "Historical" never shortens. Naming rule: always "N Day Forecast", never hyphenated "N-day", anywhere on the site.
 
 The whole site is robots-blocked (`robots.txt` Disallow all + `noindex` meta on every page). Browser tab identity: "City · Weather Chart" (forecast pages) and "City · Average Year" (historical).
 
@@ -51,8 +51,9 @@ s = open('weather10/index.html', encoding='utf-8').read()
 s = s.replace('HOURS = 240', 'HOURS = 72')
 s = s.replace('forecast_days: 10', 'forecast_days: 3')
 s = s.replace('10 Day Weather Forecast', '3 Day Weather Forecast')
-s = s.replace('<a href="/weather3/">3 Day Forecast</a><span class="here">10 Day Forecast</span>',
-              '<span class="here">3 Day Forecast</span><a href="/weather10/">10 Day Forecast</a>')
+s = s.replace('<a href="/weather3/">3 Day<span class="fc"> Forecast</span></a><span class="here">10 Day<span class="fc"> Forecast</span></span>',
+              '<span class="here">3 Day<span class="fc"> Forecast</span></span><a href="/weather10/">10 Day<span class="fc"> Forecast</span></a>')
+# the ".fc" span holds the word " Forecast", hidden under 600px so phones read "3 Day" / "10 Day"
 open('weather3/index.html', 'w', encoding='utf-8', newline='').write(s)
 ```
 
