@@ -71,7 +71,7 @@ Everything else (DAYSN = HOURS/24) derives at runtime. The two pages share all l
 
 Recents are a pull-down under the search row (#recwrap, exactly the width of input + Use Map): the button shows the active city with a caret, the menu lists up to 8 recents (active row highlighted, per-row × remove), shared across all three pages via `bw_recents`. Outside click or Escape closes it.
 
-**Day strip:** date (18px/600 with a little padding above and below), hi/lo (14px), icon emoji, condition, precip, sunrise/sunset row ("↑6:05am  ↓8:21pm", non-breaking spaces, amber #c08a12). Strip height 154 (10px air below the date row). Dates are one 18px line: spelled out ("Sunday, August 16") where the column fits it (~9.7px/char fit test - the 3 Day page), compact "Sun 8/16" where it does not (the 10 Day page, per Ken). A two-line weekday-over-date variant was tried and reverted 2026-08-23.
+**Day strip:** date (18px/600 with a little padding above and below), hi/lo (14px), icon emoji, condition, precip, sunrise/sunset row ("↑6:05am  ↓8:21pm", non-breaking spaces, amber #c08a12). Strip height 146 (space below the date visually equals the space above). Dates are one 18px line: spelled out ("Sunday, August 16") where the column fits it (~9.7px/char fit test - the 3 Day page), compact "Sun 8/16" where it does not (the 10 Day page, per Ken). A two-line weekday-over-date variant was tried and reverted 2026-08-23.
 
 **Chart rows, default order:** TEMPERATURE, WIND, CLOUDS, VISIBILITY, PRECIP, TIDE.
 
@@ -86,7 +86,7 @@ Recents are a pull-down under the search row (#recwrap, exactly the width of inp
 
 Station lookup uses `data/tide-stations.json` and `data/current-stations.json`: pre-trimmed copies of NOAA's station metadata (340KB total vs NOAA's 5.6MB). Regenerate occasionally from `api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=tidepredictions|currentpredictions` keeping `[id,name,lat,lng]` / `[id,bin,name,lat,lng]`.
 
-**Sticky date header:** scrolling past the day strip pins ONLY the date row to the top of the viewport (#stickyhead: fixed, a full clone of the chart clipped to 30px so just the date line shows; ids stripped from the clone, pointer-events none), sized/positioned to the scroller and horizontally synced to its scrollLeft; hides again near the top or past the charts. The clone is rebuilt after each render except mid-drag (would jank).
+**Sticky date header:** scrolling past the day strip pins ONLY the date row to the top of the viewport (#stickyhead: fixed, a full clone of the chart clipped to 34px - the date line with equal visual space above and below the digits (cap-height math, not rect metrics: the dates have no descenders); ids stripped from the clone, pointer-events none), sized/positioned to the scroller and horizontally synced to its scrollLeft; hides again near the top or past the charts. The clone is rebuilt after each render except mid-drag (would jank).
 
 **Chart chrome:** night shading (dusk to dawn, #dce6f2 at .35) instead of alternating day bands; darker day-boundary lines #aeb6c0 running continuously from the day strip through every chart and the gaps between them (no top rule - tried and rejected); black "now" line; orange crosshair + 19px tooltip showing every row's value for the hovered hour (sun times, temp, wind, cloud/chance, visibility incl. "(fog)", accum, tide + current).
 
