@@ -216,6 +216,8 @@ var COL = {
 var DEFAULT_LOC = { name: "Kirkland", admin1: "Washington", cc: "US", lat: 47.68, lon: -122.19, elev: 47 };
 var COMPASS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
 var WD = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+var WDF = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+var MONF = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
 /* ---------- state ---------- */
 var loc = load("bw_current") || DEFAULT_LOC;
@@ -515,7 +517,9 @@ function build(ec, pr, hr) {
     }
     var t = times[d];
     var y = +t.slice(0, 4), mo = +t.slice(5, 7), dd = +t.slice(8, 10);
-    slice.label = WD[new Date(Date.UTC(y, mo - 1, dd)).getUTCDay()] + " " + mo + "/" + dd;
+    var dow = new Date(Date.UTC(y, mo - 1, dd)).getUTCDay();
+    slice.label = WD[dow] + " " + mo + "/" + dd;
+    slice.labelLong = WDF[dow] + ", " + MONF[mo - 1] + " " + dd;
     var ic = dayIcon(slice.codes, slice.clouds, slice.psum);
     slice.icon = ic[0]; slice.cond = ic[1];
     days.push(slice);
@@ -615,7 +619,9 @@ function render() {
   /* ---- day strip ---- */
   for (d = 0; d < data.days.length; d++) {
     var dy = data.days[d], cx = xb(d * 24) + PLOTW / (DAYSN * 2);
-    s.push('<text x="' + cx + '" y="18" text-anchor="middle" font-size="14" font-weight="600" fill="#333">' + dy.label + "</text>");
+    /* spelled-out date when the column is wide enough for it (~7.5px per character at 14px/600) */
+    var dlabel = dy.labelLong && (PLOTW / DAYSN) >= dy.labelLong.length * 7.5 + 10 ? dy.labelLong : dy.label;
+    s.push('<text x="' + cx + '" y="18" text-anchor="middle" font-size="14" font-weight="600" fill="#333">' + dlabel + "</text>");
     s.push('<text x="' + cx + '" y="38" text-anchor="middle" font-size="14"><tspan fill="' + COL.temp + '" font-weight="600">' +
            Math.round(dy.hi) + "°</tspan><tspan fill=\"#999\"> | " + Math.round(dy.lo) + "°</tspan></text>");
     s.push('<text x="' + cx + '" y="72" text-anchor="middle" font-size="28">' + dy.icon + "</text>");
