@@ -178,7 +178,8 @@ var DEFSIZE = { temp: 150, wind: 140, cloud: 140, vis: 110, accum: 72, tide: 130
 var DEFORDER = ["temp", "wind", "cloud", "vis", "accum", "tide"];
 var ROWNAME = { temp: "TEMPERATURE", wind: "WIND", cloud: "CLOUDS", vis: "VISIBILITY", accum: "PRECIP", tide: "TIDE" };
 var sizes = load("bw_sizes") || {};
-Object.keys(DEFSIZE).forEach(function (k) { if (!(sizes[k] >= DEFSIZE[k])) sizes[k] = DEFSIZE[k]; });
+var MINH = DEFSIZE.accum;                    /* any chart may shrink to the precip chart's height; defaults stay as-is */
+Object.keys(DEFSIZE).forEach(function (k) { if (!(sizes[k] >= MINH)) sizes[k] = DEFSIZE[k]; });
 delete sizes.width;                          /* leftover from the pre-auto-width version */
 var order = load("bw_order");                /* user-draggable row order */
 if (!Array.isArray(order) || order.length !== DEFORDER.length ||
@@ -917,7 +918,7 @@ window.addEventListener("pointermove", function (ev) {
     return;
   }
   if (!resizing) return;
-  sizes[resizing.sec] = Math.round(Math.max(DEFSIZE[resizing.sec], resizing.h0 + (ev.clientY - resizing.y0)));
+  sizes[resizing.sec] = Math.round(Math.max(MINH, resizing.h0 + (ev.clientY - resizing.y0)));
   if (!resizeRaf) resizeRaf = requestAnimationFrame(function () { resizeRaf = 0; render(); });
 });
 window.addEventListener("resize", function () {  /* browser resized: refit chart width */

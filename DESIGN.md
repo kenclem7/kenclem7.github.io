@@ -90,7 +90,7 @@ Station lookup uses `data/tide-stations.json` and `data/current-stations.json`: 
 
 **User layout controls (persisted per device):**
 - **Reorder:** each row has a 13px black uppercase title + dot handle in the left margin (PADL 64). Drag by title or dots; the handle rides the pointer, the in-flight row is tinted blue with a dashed outline, others slide aside live. Double-click a handle: default order.
-- **Resize:** grip at each row's bottom-right; drag down to grow. Defaults are minimums. Double-click a grip: default sizes.
+- **Resize:** grip at each row's bottom-right; drag down to grow, up to shrink. Current heights are the DEFAULTS; the minimum for every row is the precip chart's height (MINH = 72px, per Ken 2026-08-22 - superseding the earlier defaults-are-minimums rule). Double-click a grip: default sizes.
 
 ## 6. Historical page anatomy (weather365)
 
