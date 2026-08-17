@@ -16,7 +16,7 @@ Personal weather site for Ken Clements. Built August 2026. This document is the 
 | kenclements.com | Redirects to Ken's LinkedIn profile | `index.html` |
 | /weather, /weather1, /weather2 | Redirect stubs to the pages above (old names) | `weather/`, `weather1/`, `weather2/` |
 
-Page navigation (#pagenav) sits under the GPS-coordinates line on every page: all three options always show, in order "3 Day Forecast · 10 Day Forecast · Historical", with the current page greyed out (span.here) and the other two as links. Naming rule: always "N Day Forecast", never hyphenated "N-day", anywhere on the site.
+Page navigation (#pagenav) sits under the GPS-coordinates line on every page: all three options always show as 34px buttons, in order "3 Day Forecast · 10 Day Forecast · Historical". The current page (span.here) is the inverse of the other two: blue fill with white text, inert; the links are white with blue text. Naming rule: always "N Day Forecast", never hyphenated "N-day", anywhere on the site.
 
 The whole site is robots-blocked (`robots.txt` Disallow all + `noindex` meta on every page). Browser tab identity: "City · Weather Chart" (forecast pages) and "City · Average Year" (historical).
 
