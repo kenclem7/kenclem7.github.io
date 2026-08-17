@@ -71,7 +71,7 @@ Everything else (DAYSN = HOURS/24) derives at runtime. The two pages share all l
 
 Recents are a pull-down under the search row (#recwrap, exactly the width of input + Use Map): the button shows the active city with a caret, the menu lists up to 8 recents (active row highlighted, per-row × remove), shared across all three pages via `bw_recents`. Outside click or Escape closes it.
 
-**Day strip:** date (18px/600 with a little padding above and below), hi/lo (14px), icon emoji, condition, precip, sunrise/sunset row ("↑6:05am  ↓8:21pm", non-breaking spaces, amber #c08a12). Strip height 144. Dates are one 18px line: spelled out ("Sunday, August 16") where the column fits it (~9.7px/char fit test - the 3 Day page), compact "Sun 8/16" where it does not (the 10 Day page, per Ken). A two-line weekday-over-date variant was tried and reverted 2026-08-23.
+**Day strip:** date (18px/600 with a little padding above and below), hi/lo (14px), icon emoji, condition, precip, sunrise/sunset row ("↑6:05am  ↓8:21pm", non-breaking spaces, amber #c08a12). Strip height 145. Dates are one 18px line: spelled out ("Sunday, August 16") where the column fits it (~9.7px/char fit test - the 3 Day page), compact "Sun 8/16" where it does not (the 10 Day page, per Ken). A two-line weekday-over-date variant was tried and reverted 2026-08-23.
 
 **Chart rows, default order:** TEMPERATURE, WIND, CLOUDS, VISIBILITY, PRECIP, TIDE.
 
