@@ -102,6 +102,10 @@
   }
   .toggle { font-size: 12.5px; color: #555; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
   .toggle .dash { display: inline-block; width: 22px; border-top: 2px dashed #e67e22; }
+  /* phones have no hover for the title tooltip: the word HRRR becomes a link opening the explainer card */
+  @media (max-width: 600px) {
+    .toggle #hrrrhelp { color: #1976d2; text-decoration: underline; }
+  }
 
   #status { font-size: 13px; color: #888; padding: 8px 2px; min-height: 20px; }
   #status .err { color: #c0392b; }
@@ -184,7 +188,7 @@
           <div id="recmenu" hidden></div>
         </div>
       </div>
-      <label class="toggle" title="HRRR = High-Resolution Rapid Refresh, NOAA's 3 km US model, re-run every hour. It is usually the sharpest forecast for the next couple of days; the orange dashes show where it agrees or disagrees with the main 10-day model."><input type="checkbox" id="hrrrToggle"> <span class="dash"></span> HRRR short-range overlay (next 2 days)</label>
+      <label class="toggle" title="HRRR = High-Resolution Rapid Refresh, NOAA's 3 km US model, re-run every hour. It is usually the sharpest forecast for the next couple of days; the orange dashes show where it agrees or disagrees with the main 10-day model."><input type="checkbox" id="hrrrToggle"> <span class="dash"></span> <span id="hrrrhelp">HRRR</span> short-range overlay (next 2 days)</label>
     </header>
     <div id="status"></div>
     <div id="daypager" hidden><button id="dayprev" onclick="stepDay(-1)" aria-label="Previous day">&#x25C0;&#xFE0E;</button><div class="dlab" id="daylabel"></div><button id="daynext" onclick="stepDay(1)" aria-label="Next day">&#x25B6;&#xFE0E;</button></div>
@@ -280,7 +284,8 @@ var WDF = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday
 var MONF = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
 /* ---------- state ---------- */
-var loc = load("bw_current") || DEFAULT_LOC;
+/* the current city is shared with the historical page; bw2_current is its legacy key */
+var loc = load("bw_current") || load("bw2_current") || DEFAULT_LOC;
 (function () {                               /* a shared link opens on its own location */
   var q = new URLSearchParams(location.search);
   if (q.get("lat") && q.get("lon")) {
@@ -1061,9 +1066,10 @@ function tipHTML(i) {
 /* daily mode reading card: a drag positions the crosshair, a tap opens the card centered
    on the screen (over a dim backdrop); tapping anywhere dismisses it */
 var mobTip = { i: null, card: false };
-function openCard(i) {
+function openCard(i) { openInfoCard(tipHTML(i)); }
+function openInfoCard(html) {                  /* any centered card content, e.g. the HRRR explainer */
   var tip = $("tip");
-  tip.innerHTML = tipHTML(i);
+  tip.innerHTML = html;
   tip.className = "cardmode";
   tip.style.left = ""; tip.style.top = ""; tip.style.display = "block";
   $("tipback").className = "on";
@@ -1475,6 +1481,11 @@ function doSearch(text) {
 /* ---------- boot ---------- */
 $("tipback").addEventListener("pointerdown", closeCard);   /* tap anywhere dismisses the reading card */
 $("tip").addEventListener("pointerdown", function () { if (mobTip.card) closeCard(); });
+$("hrrrhelp").addEventListener("click", function (ev) {    /* phones: tapping the word HRRR explains it */
+  if (!DAILY) return;                          /* desktop keeps the hover tooltip; the label still toggles */
+  ev.preventDefault(); ev.stopPropagation();
+  openInfoCard('<div class="t">HRRR</div>' + esc(document.querySelector(".toggle").title));
+});
 $("hrrrToggle").checked = showHrrr;
 $("hrrrToggle").addEventListener("change", function () {
   showHrrr = this.checked; save("bw_hrrr", showHrrr); render();

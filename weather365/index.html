@@ -194,7 +194,11 @@ var COL = {
 var DEFAULT_LOC = { name: "Kirkland", admin1: "Washington", cc: "US", lat: 47.68, lon: -122.19, elev: 47 };
 
 /* ---------- state ---------- */
-var loc = load("bw2_current") || DEFAULT_LOC;
+/* the current city is shared with the forecast pages via bw_current (2026-08-18, so switching
+   Daily <-> Historical keeps the location); bw2_current was this page's own key - migrate once */
+var loc = load("bw_current") || load("bw2_current") || DEFAULT_LOC;
+if (!load("bw_current") && load("bw2_current")) save("bw_current", loc);
+try { localStorage.removeItem("bw2_current"); } catch (e) {}
 (function () {                                       /* a shared link opens on its own location */
   var q = new URLSearchParams(location.search);
   if (q.get("lat") && q.get("lon")) {
@@ -779,7 +783,7 @@ document.addEventListener("keydown", function (ev) {
 });
 function selectLoc(l) {
   loc = l;
-  save("bw2_current", loc);
+  save("bw_current", loc);                     /* shared with the forecast pages */
   closeCard(); mobTip.i = null;                /* a new city starts with a clean crosshair */
   recents = recents.filter(function (r) { return !sameLoc(r, l); });
   recents.unshift(l);

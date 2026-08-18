@@ -34,7 +34,7 @@ The whole site is robots-blocked (`robots.txt` Disallow all + `noindex` meta on 
 |--------|----------|---------------|
 | Open-Meteo forecast API, `models=ecmwf_ifs025` | 10-day backbone: temp, feels-like, precip, weather code, cloud, wind | CC BY 4.0, **non-commercial tier**. Attribution link in every footer. If the site ever moves to a business property, the $29/mo commercial plan is required. |
 | Open-Meteo forecast API, best-match (no models param) | Precip probability (ensemble), **visibility** (ECMWF publishes none - verified, all nulls), sunrise/sunset, current conditions block (15-minute data incl. is_day) | same |
-| Open-Meteo forecast API, `models=gfs_hrrr` | HRRR short-range overlay, first ~2 days (orange dashes, toggleable; the toggle label carries a title tooltip explaining HRRR) | same |
+| Open-Meteo forecast API, `models=gfs_hrrr` | HRRR short-range overlay, first ~2 days (orange dashes, toggleable; the toggle label carries a title tooltip explaining HRRR - on phones, where hover does not exist, the word HRRR in the label is a blue link opening the same text as a centered card, #hrrrhelp) | same |
 | Open-Meteo archive API (ERA5) | weather365: one fetch of 10 years of daily history per city | same |
 | Open-Meteo geocoding API | Location search box | same |
 | Open-Meteo marine API | WATER row: 10-day sea surface temperature (real values only on salt water; row auto-hides elsewhere) | same |
@@ -107,14 +107,14 @@ Station lookup uses `data/tide-stations.json` and `data/current-stations.json`: 
 - 365 x-axis points (Feb 29 dropped). One ERA5 archive fetch per city, aggregated client-side, cached in `bw2norm3:lat,lon` (LRU 6). Schema changes bump the `bw2norm` suffix and the boot purge guard.
 - Temperature chart: avg high/low lines + pink band, plus an **outer extremes band**: each date's single highest/lowest reading of the 10 years, with the **year** in the tooltip ("▲ 103° highest (2021)"). Kirkland Jun 28 showing the 2021 heat dome is the sanity check.
 - Precipitation chart: daily average area + dark smoothed weekly-average curve (7-day circular mean then triangular kernel). Tooltip shows the day and the month total.
-- Same header kit as the forecast pages (search, map, share, recents, spinner). No reorder/resize (two fixed rows).
+- Same header kit as the forecast pages (search, map, share, recents, spinner). No reorder/resize (two fixed rows). The selected city is shared with the forecast pages via `bw_current` (see §7), so switching Daily <-> Historical never changes location.
 - **Phones (under 600px, added 2026-08-18): same reading method as the forecast pages.** The chart fits the screen (300px floor instead of 900, no sideways scroll - the year curves stay legible compressed), month labels shrink to single letters, and overlong legends stack one item per line against the right edge, swatches aligned in one column with ragged text (the 4-item temperature legend). Dragging horizontally slides the orange crosshair with a date chip ("Jul 7") riding it (`touch-action: pan-y` keeps vertical swipes scrolling); a tap opens the reading card centered on the screen over a dim backdrop, tap anywhere dismisses. Same tap rules as the forecast pages: 30px near-line grace, 10px drag slop, tap under 600ms. The `PHONE` flag mirrors the forecast pages' `DAILY` (no day window here - the whole year is always visible).
 
 ## 7. localStorage keys
 
 | Key | Meaning |
 |-----|---------|
-| `bw_current` / `bw2_current` | Selected city, forecast pages / historical page |
+| `bw_current` | Selected city, **shared by all three pages** (2026-08-18, so Daily <-> Historical keeps the location; before that the historical page had its own `bw2_current`, which is migrated into `bw_current` on first load and removed) |
 | `bw_recents` | Shared recents list (max 8) |
 | `bw_hrrr` | HRRR overlay toggle |
 | `bw_sizes` | Row heights (forecast pages) |
