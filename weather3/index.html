@@ -933,7 +933,7 @@ function bindPointer() {
       (data.vis[i] !== null ? "👁 visibility " + (data.vis[i] >= 10 ? "10+ mi" : data.vis[i].toFixed(1) + " mi") +
         (data.vis[i] < 1 ? " (fog)" : "") + "<br>" : "") +
       (data.uv && data.uv[i] !== null && data.uv[i] >= 0.5 ?
-        '<span style="color:' + uvColor(Math.round(data.uv[i])) + '">UV ' + Math.round(data.uv[i]) + " · " +
+        '🕶️ <span style="color:' + uvColor(Math.round(data.uv[i])) + '">UV ' + Math.round(data.uv[i]) + " · " +
         uvWord(Math.round(data.uv[i])) + "</span><br>" : "") +
       "💧 Accum " + fmtIn(data.accum[i]) + " in" +
       (data.tide && data.tide.h[i] !== null ? "<br>🌊 tide " + data.tide.h[i].toFixed(1) + " ft" +
