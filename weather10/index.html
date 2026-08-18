@@ -988,7 +988,7 @@ function render() {
   $("locmeta").innerHTML = latN + ", " + lonW + elev + " · updated " +
     data.fetched.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }).replace(/\s+/g, "").toLowerCase() +
     ' · <button id="sharebtn" title="Copy a link to this view" onclick="share()">share</button>' +
-    ' · <button title="Refresh" onclick="loadForecast()">⟳ refresh</button>';
+    ' · <button title="Refresh" onclick="loadForecast()">refresh</button>';
   renderRecents();
   /* rendering can add/remove the page scrollbar, changing the available width; refit once */
   var scr = document.querySelector(".scroller");

@@ -479,7 +479,7 @@ function render() {
   var elev = loc.elev !== undefined && loc.elev !== null ? " · Elev " + Math.round(loc.elev * 3.28084) + " ft" : "";
   $("locmeta").innerHTML = latN + ", " + lonW + elev +
     ' · <button id="sharebtn" title="Copy a link to this view" onclick="share()">share</button>' +
-    ' · <button title="Re-fetch" onclick="loadAverages(true)">⟳ refresh</button>';
+    ' · <button title="Re-fetch" onclick="loadAverages(true)">refresh</button>';
   renderRecents();
   if (!PHONE) closeCard();                     /* leaving phone mode dismisses the reading card */
   var scr = document.querySelector(".scroller");
