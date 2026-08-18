@@ -21,6 +21,8 @@
   script-src 'self' 'unsafe-inline';
   base-uri 'none'; object-src 'none'; form-action 'none';">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="strict-origin-when-cross-origin">   <!-- share links carry ?lat&lon&name and the page calls out to other hosts;
+     browsers already default to this, so this pins the guarantee rather than leaving it to the default -->
 <meta name="robots" content="noindex, nofollow">
 <title>Weather Chart</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⛵</text></svg>">
@@ -254,7 +256,13 @@ var DEFORDER = ["temp", "wind", "cloud", "vis", "accum", "tide", "wtemp"];
 var ROWNAME = { temp: "TEMPERATURE", wind: "WIND", cloud: "CLOUDS", vis: "VISIBILITY", accum: "PRECIP", tide: "TIDE", wtemp: "WATER TEMP" };
 var sizes = load("bw_sizes") || {};
 var MINH = DEFSIZE.accum;                    /* any chart may shrink to the precip chart's height; defaults stay as-is */
-Object.keys(DEFSIZE).forEach(function (k) { if (!(sizes[k] >= MINH)) sizes[k] = DEFSIZE[k]; });
+var MAXH = 50000;                            /* NOT a design limit - drag a row as tall as you like (per Ken 2026-08-18).
+                                                This only rejects a SAVED value that is garbage before it reaches the
+                                                layout maths: NaN, Infinity, a string like "140" that would turn the
+                                                height arithmetic into concatenation, or something absurd like 1e9. */
+Object.keys(DEFSIZE).forEach(function (k) {
+  if (!(typeof sizes[k] === "number" && sizes[k] >= MINH && sizes[k] <= MAXH)) sizes[k] = DEFSIZE[k];
+});
 if (sizes.vis === 110) sizes.vis = DEFSIZE.vis;   /* saved layouts carry the pre-standard visibility default */
 delete sizes.width;                          /* leftover from the pre-auto-width version */
 var order = load("bw_order");                /* user-draggable row order */
@@ -1323,7 +1331,7 @@ window.addEventListener("pointermove", function (ev) {
     return;
   }
   if (!resizing) return;
-  sizes[resizing.sec] = Math.round(Math.max(MINH, resizing.h0 + (ev.clientY - resizing.y0)));
+  sizes[resizing.sec] = Math.round(Math.min(MAXH, Math.max(MINH, resizing.h0 + (ev.clientY - resizing.y0))));
   if (!resizeRaf) resizeRaf = requestAnimationFrame(function () { resizeRaf = 0; render(); });
 });
 window.addEventListener("resize", function () {  /* browser resized: refit chart width */
