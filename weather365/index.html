@@ -250,7 +250,7 @@ function share() {
     });
   } else copy();
 }
-function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;"); }
 
 /* ---------- helpers ---------- */
 var US_STATE = {
@@ -548,7 +548,7 @@ function legend(s, sec, items) {
     it = items[i]; txtw = it[1].length * 6.1 + 20;
     xr = stack ? 2 : xr - txtw;
     s.push('<rect x="' + xr + '" y="' + (y - 9) + '" width="12" height="9" fill="' + it[0] + '"/>');
-    s.push('<text x="' + (xr + 16) + '" y="' + y + '" font-size="11" fill="#555">' + it[1] + "</text>");
+    s.push('<text x="' + (xr + 16) + '" y="' + y + '" font-size="11" fill="#555">' + esc(it[1]) + "</text>");
     if (stack) y += 12.5;
     else xr -= 14;
   }
