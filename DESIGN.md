@@ -100,7 +100,8 @@ Station lookup uses `data/tide-stations.json` and `data/current-stations.json`: 
 
 **User layout controls (persisted per device):**
 - **Reorder:** each row has a 13px BOLD black uppercase title + dot handle in the left margin (PADL 64). Drag by title or dots; the handle rides the pointer, the in-flight row is tinted blue with a dashed outline, others slide aside live. Double-click a handle: default order.
-- **Resize:** grip at each row's bottom-right; drag down to grow, up to shrink. Current heights are the DEFAULTS; the minimum for every row is the precip chart's height (MINH = 72px, per Ken 2026-08-22 - superseding the earlier defaults-are-minimums rule). Double-click a grip: default sizes.
+- **Resize:** grip at each row's bottom-right; drag down to grow, up to shrink. The minimum for every row is uniform: the precip chart's height (MINH = 72px, per Ken 2026-08-22 - superseding the earlier defaults-are-minimums rule). Double-click a grip: default sizes.
+- **Default heights: the standard chart row is 140px (STDH, per Ken 2026-08-18)** - wind, clouds, and visibility use it (visibility was 110 and read shorter than its neighbors; saved layouts still carrying that old default migrate to 140 on load, deliberate custom sizes survive). Explicit exceptions: temp 150 (the headline row), tide 130, water 110, precip 72. New chart rows should default to STDH unless there is a reason not to.
 
 ## 6. Historical page anatomy (weather365)
 

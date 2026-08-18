@@ -226,14 +226,16 @@
 "use strict";
 /* ---------- constants ---------- */
 var PADL = 64, PADR = 12, HOURS = 240, DAYSN = HOURS / 24;   /* PADL also holds the drag handles */
-/* chart heights are user-resizable via corner grips; these defaults are also the minimums.
+/* chart heights are user-resizable via corner grips; the minimum for every row is MINH below.
    Width is automatic: charts fill the browser (1080 floor scrolls sideways on small screens). */
-var DEFSIZE = { temp: 150, wind: 140, cloud: 140, vis: 110, accum: 72, tide: 130, wtemp: 110 };
+var STDH = 140;                              /* the standard chart row height (per Ken 2026-08-18) */
+var DEFSIZE = { temp: 150, wind: STDH, cloud: STDH, vis: STDH, accum: 72, tide: 130, wtemp: 110 };
 var DEFORDER = ["temp", "wind", "cloud", "vis", "accum", "tide", "wtemp"];
 var ROWNAME = { temp: "TEMPERATURE", wind: "WIND", cloud: "CLOUDS", vis: "VISIBILITY", accum: "PRECIP", tide: "TIDE", wtemp: "WATER TEMP" };
 var sizes = load("bw_sizes") || {};
 var MINH = DEFSIZE.accum;                    /* any chart may shrink to the precip chart's height; defaults stay as-is */
 Object.keys(DEFSIZE).forEach(function (k) { if (!(sizes[k] >= MINH)) sizes[k] = DEFSIZE[k]; });
+if (sizes.vis === 110) sizes.vis = DEFSIZE.vis;   /* saved layouts carry the pre-standard visibility default */
 delete sizes.width;                          /* leftover from the pre-auto-width version */
 var order = load("bw_order");                /* user-draggable row order */
 if (!Array.isArray(order) || order.length !== DEFORDER.length ||
