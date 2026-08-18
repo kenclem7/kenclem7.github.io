@@ -118,8 +118,9 @@
   #stickyhead svg { display: block; }
   .chartbox { position: relative; width: 1080px; }
   .chartbox.loading { min-height: 340px; }
-  #loading { position: absolute; inset: 0; z-index: 25; display: none; align-items: center; justify-content: center;
-             background: rgba(255,255,255,.55); }
+  #loading { position: absolute; inset: 0; z-index: 25; display: none; flex-direction: column; gap: 14px;
+             align-items: center; justify-content: center; background: rgba(255,255,255,.55); }
+  #loading .loadmsg { font-size: 15px; font-weight: 600; color: #444; text-align: center; padding: 0 12px; }
   .chartbox.loading #loading { display: flex; }
   .spin { width: 52px; height: 52px; border: 5px solid #cfe0f0; border-top-color: #1976d2; border-radius: 50%;
           animation: bwspin .9s linear infinite; }
@@ -199,7 +200,7 @@
     <div id="stickyhead"><div id="stickyinner"></div></div>
     <div class="scroller">
       <div class="chartbox" id="chartbox">
-        <div id="loading"><div class="spin"></div></div>
+        <div id="loading"><div class="spin"></div><div class="loadmsg">Loading the forecast</div></div>
         <div id="tip"></div>
         <div id="dragchip"></div>
         <div id="chart"></div>
