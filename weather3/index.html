@@ -941,7 +941,7 @@ function bindPointer() {
           " · current " + Math.abs(data.tide.cur.v[i]).toFixed(1) + " kn " +
           (data.tide.cur.v[i] >= 0 ? "flood" : "ebb") : "") : "") +
       (data.wtemp && data.wtemp[i] !== null ? "<br>≋ water " + Math.round(data.wtemp[i]) + "°F" : "") +
-      (data.aqi && data.aqi[i] !== null ? "<br>🔥 AQI " + Math.round(data.aqi[i]) + " (" + aqiWord(data.aqi[i]) + ")" +
+      (data.aqi && data.aqi[i] !== null ? "<br>😷 AQI " + Math.round(data.aqi[i]) + " (" + aqiWord(data.aqi[i]) + ")" +
         (data.pm25 && data.pm25[i] !== null ? " · PM2.5 " + Math.round(data.pm25[i]) : "") : "");
     if (showHrrr && data.hrrr.wspd[i] !== null) {
       html += '<div class="tipdiv"></div><span class="hrrr">HRRR: ' + Math.round(data.hrrr.wspd[i]) + " mph from " +
