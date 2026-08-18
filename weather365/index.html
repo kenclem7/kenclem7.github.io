@@ -26,6 +26,9 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Average Year · Weather Chart</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌡️</text></svg>">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">  <!-- Safari renders no SVG favicons and the home-screen tile needs a real PNG; /favicon.ico ships too -->
+<meta name="theme-color" content="#eef1f4">
+<link rel="preconnect" href="https://archive-api.open-meteo.com" crossorigin>  <!-- the one fetch this page awaits: warm the TLS setup while the HTML parses -->
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif; background: #eef1f4; color: #222; }
@@ -62,6 +65,7 @@
                   border-radius: 6px; cursor: pointer; }
   .mapfoot .use[disabled] { opacity: .4; cursor: default; }
   #q { flex: 1; min-width: 0; padding: 8px 10px; font-size: 14px; border: 1px solid #c5ccd4; border-radius: 6px; outline: none; }
+  @media (max-width: 600px) { #q { font-size: 16px; } }  /* under 16px iOS Safari zooms the page on focus and leaves it zoomed */
   #q:focus { border-color: #1976d2; }
   #pagenav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
   #pagenav a, #pagenav .here { padding: 8px 12px; font-size: 14px; font-weight: 600; line-height: 16px; border-radius: 6px; white-space: nowrap; }
@@ -93,8 +97,8 @@
   #recmenu .row:hover { background: #eaf3fc; }
   #recmenu .row.active { color: #0d5ba1; font-weight: 600; background: #f2f8fd; }
   #recmenu .row b { font-weight: inherit; flex: 1; }
-  #recmenu .row .sub { color: #98a2ad; font-size: 12px; }
-  #recmenu .row .rm { color: #98a2ad; font-size: 14px; line-height: 1; padding: 1px 4px; border-radius: 8px; }
+  #recmenu .row .sub { color: #6b7683; font-size: 12px; }
+  #recmenu .row .rm { color: #6b7683; font-size: 14px; line-height: 1; padding: 1px 4px; border-radius: 8px; }
   #recmenu .row .rm:hover { background: #d9dee4; color: #555; }
 
   #status { font-size: 13px; color: #888; padding: 8px 2px; min-height: 20px; }
@@ -111,6 +115,7 @@
   .spin { width: 52px; height: 52px; border: 5px solid #cfe0f0; border-top-color: #1976d2; border-radius: 50%;
           animation: bwspin .9s linear infinite; }
   @keyframes bwspin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2.5s; } }
   svg text { font-family: inherit; }
   #tip { position: absolute; display: none; z-index: 20; background: rgba(255,255,255,.97); border: 1px solid #b9c2cb;
          border-radius: 8px; box-shadow: 0 3px 10px rgba(0,0,0,.15); padding: 11px 15px; font-size: 19px; line-height: 1.5;
@@ -129,7 +134,7 @@
     #chart svg { touch-action: pan-y; -webkit-user-select: none; user-select: none; }
     .chartbox { width: auto; }
   }
-  .foot { font-size: 11.5px; color: #98a2ad; padding: 10px 2px 6px; }
+  .foot { font-size: 11.5px; color: #6b7683; padding: 10px 2px 6px; }
   .foot a { color: #1976d2; text-decoration: none; }
   .foot a:hover { text-decoration: underline; }
 </style>
@@ -168,7 +173,7 @@
         <div id="chart"></div>
       </div>
     </div>
-    <div class="foot">Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> · ERA5 historical reanalysis · daily averages over the last 10 full years (2016-2025), Feb 29 excluded</div>
+    <div class="foot">Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> · ERA5 historical reanalysis · daily averages over the last 10 full years (<span id="yrspan">2016-2025</span>), Feb 29 excluded</div>
     <div class="foot">Location privacy: the place you pick is sent to Open-Meteo for the historical data, to OpenStreetMap Nominatim and to BigDataCloud for place names, and to OpenStreetMap for map tiles. The search box sends what you type, not your coordinates. This site has no analytics and no server of its own, and your saved cities stay in this browser.</div>
   </div>
 </div>
@@ -227,13 +232,18 @@ if (!load("bw_current") && load("bw2_current")) save("bw_current", loc);
 try { localStorage.removeItem("bw2_current"); } catch (e) {}
 (function () {                                       /* a shared link opens on its own location */
   var q = new URLSearchParams(location.search);
-  if (q.get("lat") && q.get("lon")) {
+  var qla = +q.get("lat"), qlo = +q.get("lon");   /* a garbage or truncated link falls back to the saved city */
+  if (q.get("lat") && q.get("lon") && isFinite(qla) && Math.abs(qla) <= 90 && isFinite(qlo) && Math.abs(qlo) <= 180) {
     loc = { name: q.get("name") || "Shared spot", admin1: q.get("admin1") || "", cc: q.get("cc") || "",
-            lat: +q.get("lat"), lon: +q.get("lon") };
-    if (q.get("elev")) loc.elev = +q.get("elev");
+            lat: qla, lon: qlo };
+    if (q.get("elev") && isFinite(+q.get("elev"))) loc.elev = +q.get("elev");
   }
 })();
 var recents = load("bw_recents") || [DEFAULT_LOC];   /* shared with the forecast pages */
+/* shared keys can hold corrupt-but-valid JSON (non-array, null entry, string coords):
+   shape-check before renderRecents throws at boot, ahead of the first fetch */
+if (!Array.isArray(recents) || recents.some(function (r) { return !r || typeof r.lat !== "number" || !isFinite(r.lat) || typeof r.lon !== "number" || !isFinite(r.lon); })) recents = [DEFAULT_LOC];
+if (!loc || typeof loc.lat !== "number" || !isFinite(loc.lat) || typeof loc.lon !== "number" || !isFinite(loc.lon)) loc = DEFAULT_LOC;
 var data = null;                                     /* {hi[365], lo[365], p[365], mtot[12], fetched} */
 var fetchToken = 0;
 
@@ -338,8 +348,10 @@ function setStatus(html) { $("status").innerHTML = html; }
 function loadAverages(force) {
   var tok = ++fetchToken;
   var cached = force ? null : readCache(loc);
-  if (cached && !(cached.rh && cached.rhy)) cached = null;   /* older-schema cache: refetch */
-  if (cached) { data = cached; render(); setStatus(""); return; }
+  if (cached && !(cached.rh && cached.rhy && cached.years === YEARS_LABEL)) cached = null;   /* older schema
+     or an old year window: refetch (the January constant bump must invalidate every cached city) */
+  if (cached) { data = cached; render(); setStatus(""); setLoading(false); return; }   /* an in-flight fetch for the
+     previous city dies at the token guard without ever clearing the overlay: clear it here */
   setStatus("Crunching 10 years of daily history for " + esc(locLabel(loc, true)) + "… (a few seconds)");
   setLoading(true);
   var url = "https://archive-api.open-meteo.com/v1/archive?latitude=" + loc.lat + "&longitude=" + loc.lon +
@@ -374,7 +386,7 @@ function loadAverages(force) {
       md = doyToMD(i);
       if (p[i] !== null) mtot[md[0]] += p[i];
     }
-    data = { hi: hi, lo: lo, rh: rh, rl: rl, rhy: rhy, rly: rly, p: p, mtot: mtot, fetched: Date.now() };
+    data = { hi: hi, lo: lo, rh: rh, rl: rl, rhy: rhy, rly: rly, p: p, mtot: mtot, years: YEARS_LABEL, fetched: Date.now() };
     writeCache(loc, data);
     render();
     setStatus("");
@@ -812,18 +824,8 @@ function useMyLocation() {
     var picked = mapPick;
     var settle = function () {
       if (mapPick === picked) mapPick = null;
-      var naming = picked.naming, before = picked.name;
-      delete picked.naming;                    /* promises do not belong in localStorage */
-      selectLoc(picked);
-      /* naming slower than the 6s cap: picked IS loc (mutated in place), so adopt the
-         late name when it lands - a coordinate headline heals itself */
-      if (naming) naming.then(function () {
-        if (sameLoc(loc, picked) && picked.name !== before) {
-          save("bw_current", loc);
-          save("bw_recents", recents);
-          render();
-        }
-      });
+      selectLoc(picked);                       /* selectLoc strips the naming promise and adopts the
+                                                  late name for every pick path - map, GPS, search */
     };
     Promise.race([picked.naming || Promise.resolve(),
                   new Promise(function (ok) { setTimeout(ok, 6000); })]).then(settle, settle);
@@ -865,6 +867,9 @@ document.addEventListener("keydown", function (ev) {
   if (ev.key === "Escape") { var rm = $("recmenu"); if (rm) rm.hidden = true; }
 });
 function selectLoc(l) {
+  var naming = l.naming, before = l.name;      /* map + GPS picks carry a naming chain; promises do not
+                                                  belong in localStorage, so strip it before any save */
+  delete l.naming;
   loc = l;
   save("bw_current", loc);                     /* shared with the forecast pages */
   closeCard(); mobTip.i = null;                /* a new city starts with a clean crosshair */
@@ -874,6 +879,15 @@ function selectLoc(l) {
   save("bw_recents", recents);
   renderRecents();
   loadAverages();
+  if (naming) naming.then(function () {        /* naming still running: l IS loc (and the recents head),
+                                                  so adopt the late name in place and re-save */
+    if (sameLoc(loc, l) && l.name !== before) {
+      save("bw_current", loc);
+      save("bw_recents", recents);
+      render();
+      renderRecents();
+    }
+  });
 }
 var searchTimer = 0;
 $("q").addEventListener("input", function () {
@@ -886,17 +900,21 @@ $("q").addEventListener("keydown", function (ev) {
   if (ev.key === "Escape") { $("results").style.display = "none"; }
   if (ev.key === "Enter") {
     var first = $("results").querySelector("div[data-i]");
-    if (first) first.click();
+    if ($("results").style.display !== "none" && first) first.click();   /* a hidden list still holds stale rows:
+                                                                            never Enter-pick an invisible city */
   }
 });
 document.addEventListener("click", function (ev) {
   if (!ev.target.closest(".searchwrap")) $("results").style.display = "none";
 });
 var lastResults = [];
+var searchSeq = 0;
 function geocode(q) {
+  var seq = ++searchSeq;                       /* a slow earlier response must not overwrite a newer query */
   fetch("https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(q) + "&count=6&language=en&format=json")
     .then(function (r) { return r.json(); })
     .then(function (r) {
+      if (seq !== searchSeq) return;
       var host = $("results"); host.innerHTML = "";
       lastResults = (r.results || []).map(function (g) {
         return { name: g.name, admin1: g.admin1 || "", cc: g.country_code || "", lat: g.latitude, lon: g.longitude, elev: g.elevation };
@@ -905,7 +923,7 @@ function geocode(q) {
       lastResults.forEach(function (g, i) {
         var d = document.createElement("div");
         d.setAttribute("data-i", i);
-        d.textContent = locLabel(g) + (g.cc && g.cc !== "US" ? "" : "");
+        d.textContent = locLabel(g);
         d.addEventListener("click", function () {
           $("q").value = ""; $("results").style.display = "none";
           selectLoc(g);
@@ -914,7 +932,11 @@ function geocode(q) {
       });
       host.style.display = "block";
     })
-    .catch(function () {});
+    .catch(function () {                       /* typing against a dead geocoder deserves feedback, not silence */
+      if (seq !== searchSeq) return;
+      $("results").innerHTML = '<div class="none">Search failed</div>';
+      $("results").style.display = "block";
+    });
 }
 
 /* ---------- boot ---------- */
@@ -922,6 +944,10 @@ $("tipback").addEventListener("pointerdown", closeCard);   /* tap anywhere dismi
 $("tip").addEventListener("pointerdown", function () { if (mobTip.card) closeCard(); });
 window.__bw2 = { get data() { return data; }, get loc() { return loc; }, get recents() { return recents; } };
 placeNav();
+$("yrspan").textContent = YEARS_LABEL;         /* the footer window rides the constants, not hand-edits */
+setTitle(locLabel(loc), ("Average Year (" + YEARS_LABEL + ")").replace(/ /g, "\u00A0"));
+document.title = locLabel(loc, true) + " · Average Year";  /* the right title before the ERA5 crunch -
+                                                  this page has the site's longest wait, the worst place to flash a generic heading */
 renderRecents();
 loadAverages();
 </script>
