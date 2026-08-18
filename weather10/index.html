@@ -665,7 +665,7 @@ function build(ec, pr, hr, mar, aq) {
     var wv = mar.hourly.sea_surface_temperature[w];
     if (wi !== undefined && wv !== null && wv !== undefined) { wtemp[wi] = wv; hasW = true; }
   }
-  /* air quality (7-day horizon, nulls beyond) */
+  /* air quality (7 day horizon, nulls beyond) */
   var aqi = new Array(times.length).fill(null), pm25 = new Array(times.length).fill(null);
   if (aq && aq.hourly) for (var q2 = 0; q2 < aq.hourly.time.length; q2++) {
     var ai = byTime[aq.hourly.time[q2]];
