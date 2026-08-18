@@ -664,15 +664,21 @@ if (mqPhone && mqPhone.addEventListener) mqPhone.addEventListener("change", func
 
 /* ---------- map picker (Leaflet + OpenStreetMap tiles: free, no key, no account) ---------- */
 var lmap = null, lmark = null, mapPick = null;
+/* Leaflet is self-hosted under /vendor/leaflet/ rather than pulled from a CDN. It is the only
+   third-party CODE this site loads (everything else it fetches is data, which the page treats
+   as values), so a compromised CDN would have run with full access to this origin: the DOM,
+   every bw_* key, any GPS fix the user had granted. Vendored 1.9.4, byte-verified against the
+   published SRI digest. leaflet.css resolves its marker and layers images relative to itself,
+   so vendor/leaflet/images/ ships beside it. Bump both files together on any version change. */
 function loadLeaflet() {
   if (window.L) return Promise.resolve();
   return new Promise(function (ok, fail) {
     var css = document.createElement("link");
     css.rel = "stylesheet";
-    css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+    css.href = "/vendor/leaflet/leaflet.css";
     document.head.appendChild(css);
     var js = document.createElement("script");
-    js.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+    js.src = "/vendor/leaflet/leaflet.js";
     js.onload = ok;
     js.onerror = function () { fail(new Error("map library did not load")); };
     document.head.appendChild(js);

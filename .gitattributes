@@ -1,0 +1,5 @@
+# Vendored third-party assets are stored byte-for-byte exactly as published, so their
+# upstream SRI digests stay verifiable (see DESIGN.md section 3). core.autocrlf is true on
+# Ken's machine and would otherwise rewrite line endings: leaflet.css ships CRLF upstream and
+# leaflet.js ships LF, so both would drift from their published hashes on a checkout round trip.
+vendor/** -text
