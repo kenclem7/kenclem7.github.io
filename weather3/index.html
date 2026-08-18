@@ -749,6 +749,13 @@ function setTitle(city, tiedPhrase) {
   if (!fits) el.textContent = city + " " + tiedPhrase;
 }
 
+/* unbreakable phrase (nbsp); bullet separator only when the whole title fits one line.
+   Called at boot too, so phones never flash the static h1 before the first render. */
+function renderTitle() {
+  var tsuf = DAILY ? "Daily Weather Forecast" : "3 Day Weather Forecast";
+  setTitle(locLabel(loc), tsuf.replace(/ /g, "\u00A0"));
+}
+
 /* ---------- render ---------- */
 function render() {
   if (!data) return;
@@ -1008,9 +1015,7 @@ function render() {
     $("dayprev").disabled = viewDay <= 0;
     $("daynext").disabled = viewDay >= DAYSN - 1;
   } else closeCard();                          /* leaving daily mode dismisses the reading card */
-  /* unbreakable phrase (nbsp); bullet separator only when the whole title fits one line */
-  var tsuf = DAILY ? "Daily Weather Forecast" : "3 Day Weather Forecast";
-  setTitle(locLabel(loc), tsuf.replace(/ /g, "\u00A0"));
+  renderTitle();
   document.title = locLabel(loc, true) + " · Weather Chart";
   renderNow();
   var latN = Math.abs(loc.lat).toFixed(2) + "°" + (loc.lat >= 0 ? "N" : "S");
@@ -1539,6 +1544,7 @@ $("hrrrToggle").addEventListener("change", function () {
   showHrrr = this.checked; save("bw_hrrr", showHrrr); render();
 });
 placeNav();
+renderTitle();                                 /* the right title before any data lands */
 wireSearch();
 renderRecents();
 loadForecast();
