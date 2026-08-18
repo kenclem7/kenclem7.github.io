@@ -2,6 +2,22 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- Content-Security-Policy. GitHub Pages serves no custom response headers (DESIGN.md section 2), so this
+     has to be a meta tag, and that costs two things. frame-ancestors is ignored in meta form, so this cannot
+     stop the page being framed (security review finding 06, open). script-src has to keep unsafe-inline
+     because the markup carries inline onclick handlers, which a script hash cannot cover; hashing would mean
+     moving all of them to addEventListener first. What it does buy is connect-src and img-src: injected
+     script cannot phone home to a host that is not on this list. Every host here is one the page really
+     calls (see DESIGN.md section 3). Add to this list when adding an API, or the call fails.
+     api-bdc.io is here because api.bigdatacloud.net answers with a 307 to it, and CSP is enforced on the
+     redirect target as well as the request: with only the documented host listed, every water-naming
+     lookup was refused. Checked 2026-08-18, it is the only one of the nine hosts that redirects. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self';
+  connect-src 'self' https://api.open-meteo.com https://marine-api.open-meteo.com https://air-quality-api.open-meteo.com https://archive-api.open-meteo.com https://geocoding-api.open-meteo.com https://api.tidesandcurrents.noaa.gov https://nominatim.openstreetmap.org https://api.bigdatacloud.net https://api-bdc.io;
+  img-src 'self' data: https://tile.openstreetmap.org;
+  style-src 'self' 'unsafe-inline';
+  script-src 'self' 'unsafe-inline';
+  base-uri 'none'; object-src 'none'; form-action 'none';">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Weather Chart</title>
