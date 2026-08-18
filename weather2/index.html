@@ -2,6 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<!-- Content-Security-Policy, same shape as the chart pages (DESIGN.md section 2) but with connect-src
+     'none': this page fetches nothing and never should. unsafe-inline covers the inline redirect script,
+     and the homepage's inline stylesheet. Navigation is not governed by CSP, so neither the meta refresh
+     nor location.replace is affected; both were tested. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'none';
+  img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';
+  base-uri 'none'; object-src 'none'; form-action 'none';">
 <meta name="robots" content="noindex, nofollow">
 <title>Weather Chart</title>
 <meta http-equiv="refresh" content="0; url=/weather365/">
