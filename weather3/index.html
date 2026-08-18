@@ -115,6 +115,7 @@
          pointer-events: none; white-space: nowrap; }
   #tip .t { font-weight: 600; }
   #tip .hrrr { color: #b35c00; font-size: 17px; }
+  #tip .tipdiv { border-top: 1px solid #d7dde3; margin: 7px 0 5px; }
   #chart .rsz { cursor: ns-resize; touch-action: none; }
   #chart .rsz:hover line { stroke: #5b6672; }
   #chart .drag { cursor: grab; touch-action: none; }
@@ -183,7 +184,7 @@ var PADL = 64, PADR = 12, HOURS = 72, DAYSN = HOURS / 24;   /* PADL also holds t
    Width is automatic: charts fill the browser (1080 floor scrolls sideways on small screens). */
 var DEFSIZE = { temp: 150, wind: 140, cloud: 140, vis: 110, accum: 72, tide: 130, wtemp: 110 };
 var DEFORDER = ["temp", "wind", "cloud", "vis", "accum", "tide", "wtemp"];
-var ROWNAME = { temp: "TEMPERATURE", wind: "WIND", cloud: "CLOUDS", vis: "VISIBILITY", accum: "PRECIP", tide: "TIDE", wtemp: "WATER" };
+var ROWNAME = { temp: "TEMPERATURE", wind: "WIND", cloud: "CLOUDS", vis: "VISIBILITY", accum: "PRECIP", tide: "TIDE", wtemp: "WATER TEMP" };
 var sizes = load("bw_sizes") || {};
 var MINH = DEFSIZE.accum;                    /* any chart may shrink to the precip chart's height; defaults stay as-is */
 Object.keys(DEFSIZE).forEach(function (k) { if (!(sizes[k] >= MINH)) sizes[k] = DEFSIZE[k]; });
@@ -943,7 +944,7 @@ function bindPointer() {
       (data.aqi && data.aqi[i] !== null ? "<br>🔥 AQI " + Math.round(data.aqi[i]) + " (" + aqiWord(data.aqi[i]) + ")" +
         (data.pm25 && data.pm25[i] !== null ? " · PM2.5 " + Math.round(data.pm25[i]) : "") : "");
     if (showHrrr && data.hrrr.wspd[i] !== null) {
-      html += '<br><span class="hrrr">HRRR: ' + Math.round(data.hrrr.wspd[i]) + " mph from " +
+      html += '<div class="tipdiv"></div><span class="hrrr">HRRR: ' + Math.round(data.hrrr.wspd[i]) + " mph from " +
               compass(data.hrrr.wdir[i]) + " · " + Math.round(data.hrrr.temp[i]) + "° · cloud " +
               Math.round(data.hrrr.cloud[i]) + "%</span>";
     }

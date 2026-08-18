@@ -75,7 +75,7 @@ Recents are a pull-down under the search row (#recwrap, exactly the width of inp
 
 **Day strip:** date (18px/600 with a little padding above and below), hi/lo (14px), icon emoji, condition, UV peak directly below the condition, precip, sunrise/sunset row ("↑6:05am  ↓8:21pm", non-breaking spaces, amber #c08a12), and a UV line: each day PEAK as "UV 7" colored by the standard scale via uvColor() (green/amber/orange/red/purple; the rounded value classifies; per-hour UV with category word in the tooltip, suppressed under 0.5 at night). Deliberately NO UV chart row - decided 2026-08-24, the daily peak carries the signal. Strip height 160 (space below the date visually equals the space above). Dates are one 18px line: spelled out ("Sunday, August 16") where the column fits it (~9.7px/char fit test - the 3 Day page), compact "Sun 8/16" where it does not (the 10 Day page, per Ken). A two-line weekday-over-date variant was tried and reverted 2026-08-23.
 
-**Chart rows, default order:** TEMPERATURE, WIND, CLOUDS, VISIBILITY, PRECIP, TIDE, WATER.
+**Chart rows, default order:** TEMPERATURE, WIND, CLOUDS, VISIBILITY, PRECIP, TIDE, WATER TEMP.
 
 | Row | Contents |
 |-----|----------|
