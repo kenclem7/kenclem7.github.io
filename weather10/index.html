@@ -188,7 +188,7 @@
           <div id="recmenu" hidden></div>
         </div>
       </div>
-      <label class="toggle" title="HRRR = High-Resolution Rapid Refresh, NOAA's 3 km US model, re-run every hour. It is usually the sharpest forecast for the next couple of days; the orange dashes show where it agrees or disagrees with the main 10-day model."><input type="checkbox" id="hrrrToggle"> <span class="dash"></span> <span id="hrrrhelp">HRRR</span> short-range overlay (next 2 days)</label>
+      <label class="toggle" title="HRRR = High-Resolution Rapid Refresh, NOAA's 3 km US model, re-run every hour. It is usually the sharpest forecast for the next couple of days; the orange dashes show where it agrees or disagrees with the 3 Day and 10 Day models."><input type="checkbox" id="hrrrToggle"> <span class="dash"></span> <span id="hrrrhelp">HRRR</span> short-range overlay (next 2 days)</label>
     </header>
     <div id="status"></div>
     <div id="daypager" hidden><button id="dayprev" onclick="stepDay(-1)" aria-label="Previous day">&#x25C0;&#xFE0E;</button><div class="dlab" id="daylabel"></div><button id="daynext" onclick="stepDay(1)" aria-label="Next day">&#x25B6;&#xFE0E;</button></div>
@@ -1488,7 +1488,7 @@ $("hrrrhelp").addEventListener("click", function (ev) {    /* phones: tapping th
   ev.preventDefault(); ev.stopPropagation();
   /* phones show one day at a time, so the comparison target reads "daily model" there */
   openInfoCard('<div class="t">HRRR</div>' +
-               esc(document.querySelector(".toggle").title.replace("10-day model", "daily model")));
+               esc(document.querySelector(".toggle").title.replace("3 Day and 10 Day models", "daily model")));
 });
 $("hrrrToggle").checked = showHrrr;
 $("hrrrToggle").addEventListener("change", function () {
