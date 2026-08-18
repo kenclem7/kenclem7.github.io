@@ -767,11 +767,11 @@ function render() {
     var dlabel = dy.labelLong && colw >= dy.labelLong.length * 9.7 + 10 ? dy.labelLong : dy.label;
     s.push('<text x="' + cx + '" y="23" text-anchor="middle" font-size="18" font-weight="600" fill="#333">' + dlabel + "</text>");
     s.push('<text x="' + cx + '" y="48" text-anchor="middle" font-size="14"><tspan fill="' + COL.temp + '" font-weight="600">' +
-           Math.round(dy.hi) + "°</tspan><tspan fill=\"#999\"> | " + Math.round(dy.lo) + "°</tspan></text>");
+           Math.round(dy.hi) + "°</tspan><tspan fill=\"#1a1a1a\"> | " + Math.round(dy.lo) + "°</tspan></text>");
     s.push('<text x="' + cx + '" y="82" text-anchor="middle" font-size="28">' + dy.icon + "</text>");
     s.push('<text x="' + cx + '" y="103" text-anchor="middle" font-size="12" fill="#666">' + dy.cond + "</text>");
     var wet = dy.psum >= 0.005;
-    s.push('<text x="' + cx + '" y="136" text-anchor="middle" font-size="12" fill="' + (wet ? "#1976d2" : "#9aa3ac") + '">' +
+    s.push('<text x="' + cx + '" y="136" text-anchor="middle" font-size="12" fill="' + (wet ? "#1976d2" : "#1a1a1a") + '">' +
            (wet ? "💧 " : "") + (wet ? fmtIn(dy.psum) : "0") + " in</text>");
     if (dy.uvx !== null) s.push('<text x="' + cx + '" y="118" text-anchor="middle" font-size="11.5" font-weight="600" fill="' +
                                 uvColor(Math.round(dy.uvx)) + '">UV ' + Math.round(dy.uvx) + "</text>");
