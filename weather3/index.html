@@ -29,6 +29,9 @@
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">  <!-- Safari renders no SVG favicons and the home-screen tile needs a real PNG; /favicon.ico ships too -->
 <meta name="theme-color" content="#eef1f4">
 <link rel="preconnect" href="https://api.open-meteo.com" crossorigin>  <!-- the first fetch this page awaits: warm the TLS setup while the HTML parses -->
+<link rel="dns-prefetch" href="https://marine-api.open-meteo.com">
+<link rel="dns-prefetch" href="https://air-quality-api.open-meteo.com">
+<link rel="dns-prefetch" href="https://api.tidesandcurrents.noaa.gov">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif; background: #eef1f4; color: #222; }
@@ -58,6 +61,7 @@
   #q { flex: 1; min-width: 0; padding: 8px 10px; font-size: 14px; border: 1px solid #c5ccd4; border-radius: 6px; outline: none; }
   @media (max-width: 600px) { #q { font-size: 16px; } }  /* under 16px iOS Safari zooms the page on focus and leaves it zoomed */
   #q:focus { border-color: #1976d2; }
+  #q:focus-visible { outline: 2px solid #1976d2; outline-offset: 1px; }
   .mapbtn { align-self: flex-start; padding: 8px 12px; font-size: 14px; border: 1px solid #c5ccd4; border-radius: 6px;
             background: #fff; cursor: pointer; white-space: nowrap; }
   .mapbtn:hover { border-color: #1976d2; color: #1976d2; }
@@ -66,12 +70,12 @@
   #mapwrap { position: fixed; inset: 0; z-index: 60; background: rgba(20,28,36,.55); display: none;
              align-items: center; justify-content: center; padding: 20px; }
   #mapwrap.on { display: flex; }
-  .mapcard { background: #fff; border-radius: 10px; width: min(900px, 96vw); max-height: 92vh; display: flex;
+  .mapcard { background: #fff; border-radius: 10px; width: min(900px, 96vw); max-height: 92vh; max-height: min(92vh, 92dvh); display: flex;
              flex-direction: column; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,.3); }
   .maphead { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #e4e9ee; }
   .maphead h2 { font-size: 16px; font-weight: 600; flex: 1; }
   .maphead .x { border: none; background: none; font-size: 24px; line-height: 1; cursor: pointer; color: #8a939c; padding: 0 4px; }
-  #mapbox { flex: 1; min-height: 60vh; cursor: crosshair; }
+  #mapbox { flex: 1; min-height: 60vh; min-height: min(60vh, 60dvh); cursor: crosshair; }
   .mapfoot { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid #e4e9ee; }
   .mapfoot .sel { flex: 1; font-size: 13.5px; color: #444; }
   .mapfoot .use { padding: 8px 14px; font-size: 14px; border: 1px solid #1976d2; background: #1976d2; color: #fff;
@@ -100,7 +104,7 @@
   #results { position: absolute; top: 100%; left: 0; right: 0; z-index: 51; background: #fff; border: 1px solid #c5ccd4;
              border-radius: 0 0 6px 6px; box-shadow: 0 6px 16px rgba(0,0,0,.12); max-height: 240px; overflow-y: auto; }
   #results div { padding: 8px 10px; font-size: 13px; cursor: pointer; }
-  #results div:hover, #results div.sel { background: #eaf3fc; }
+  #results div:hover { background: #eaf3fc; }
   #results .none { color: #999; cursor: default; }
 
   #recrow { display: flex; gap: 8px; margin-top: 8px; }
@@ -117,6 +121,7 @@
   #recmenu .row b { font-weight: inherit; flex: 1; }
   #recmenu .row .sub { color: #6b7683; font-size: 12px; }
   #recmenu .row .rm { color: #6b7683; font-size: 14px; line-height: 1; padding: 1px 4px; border-radius: 8px; }
+  #recmenu .row:focus-visible, #recmenu .row .rm:focus-visible { outline: 2px solid #1976d2; outline-offset: -2px; }
   #recmenu .row .rm:hover { background: #d9dee4; color: #555; }
   /* narrow screens: stack the header (must sit AFTER the base header rules to win the cascade) */
   @media (max-width: 900px) {
@@ -132,7 +137,7 @@
     .toggle #hrrrhelp { color: #1976d2; text-decoration: underline; }
   }
 
-  #status { font-size: 13px; color: #888; padding: 8px 2px; min-height: 20px; }
+  #status { font-size: 13px; color: #6e6e6e; padding: 8px 2px; min-height: 20px; }
   #status .err { color: #c0392b; }
   #status button { margin-left: 8px; font-size: 12.5px; cursor: pointer; }
 
@@ -163,7 +168,7 @@
   #tipback { position: fixed; inset: 0; z-index: 55; background: rgba(15,23,32,.35); display: none; }
   #tipback.on { display: block; }
   #tip.cardmode { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 56;
-                  pointer-events: auto; white-space: normal; width: min(92vw, 430px); max-height: 82vh;
+                  pointer-events: auto; white-space: normal; width: min(92vw, 430px); max-height: 82vh; max-height: min(82vh, 82dvh);
                   overflow-y: auto; font-size: 17px; }
   #dragchip { position: absolute; display: none; z-index: 18; transform: translateX(-50%); background: #fff;
               border: 1px solid #f6a04d; border-radius: 10px; padding: 2px 9px; font-size: 12.5px; font-weight: 600;
@@ -207,7 +212,7 @@
         <div class="searchrow">
           <input id="q" type="text" placeholder="Add location (city or town)…" autocomplete="off" spellcheck="false">
           <button class="mapbtn" onclick="openMap()">Use Map</button>
-          <button class="mapbtn gps" onclick="useMyLocation()" title="Use my current location"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><line x1="12" y1="1" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="1" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="23" y2="12"/></svg></button>
+          <button class="mapbtn gps" onclick="useMyLocation()" title="Use my current location" aria-label="Use my current location"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><line x1="12" y1="1" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="1" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="23" y2="12"/></svg></button>
         </div>
         <div id="results" hidden></div>
         <div id="recrow">
@@ -215,7 +220,7 @@
             <button id="recbtn" onclick="toggleRecents()" title="Recent locations"><span id="recbtnlabel"></span><span class="caret">▼</span></button>
             <div id="recmenu" hidden></div>
           </div>
-          <button class="mapbtn gps" id="sharebtn" onclick="share()" title="Copy a link to this view"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>
+          <button class="mapbtn gps" id="sharebtn" onclick="share()" title="Copy a link to this view" aria-label="Share this view"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>
         </div>
       </div>
       <label class="toggle" title="HRRR = High-Resolution Rapid Refresh, NOAA's 3 km US model, re-run every hour. It is usually the sharpest forecast for the next couple of days; the orange dashes show where it agrees or disagrees with the 3 Day and 10 Day models."><input type="checkbox" id="hrrrToggle"> <span class="dash"></span> <span id="hrrrhelp">HRRR</span> short-range overlay (next 2 days)</label>
@@ -240,7 +245,7 @@
 
 <div id="mapwrap" onclick="if (event.target === this) closeMap()">
   <div class="mapcard">
-    <div class="maphead"><h2>Pick a spot on the map</h2><button class="x" onclick="closeMap()" title="Close">×</button></div>
+    <div class="maphead"><h2>Pick a spot on the map</h2><button class="x" onclick="closeMap()" title="Close" aria-label="Close">×</button></div>
     <div id="mapbox"></div>
     <div class="mapfoot">
       <div class="sel" id="mapsel">Click anywhere on the map to choose a location.</div>
@@ -314,7 +319,7 @@ var COL = {
   temp: "#cf3049", feels: "#9b59b6", windLine: "#93c4ec", windArrow: "#14396e", gust: "#b6c3d2",
   cloudFill: "#c9ced4", cloudLine: "#8a939c", probFill: "#8fd0f0", probLine: "#2a92cf",
   accumFill: "#9bd7ea", accumLine: "#3fa7c9", hourlyP: "#1e7d32", hrrr: "#e67e22",
-  grid: "#e8eaed", dayline: "#aeb6c0", band: "#f5f7f9", now: "#444",
+  grid: "#e8eaed", dayline: "#aeb6c0", now: "#444",
   visFill: "#dfe6ec", visLine: "#7f8c99", fogBand: "#f7e2c6", fogLine: "#d98a2b",
   tideFill: "#bfe3f2", tideLine: "#2b8cb8", curLine: "#7b4fa8",
   wtempFill: "#9fd4cb", wtempLine: "#1f7a70", aqi: "#a0522d"
@@ -419,14 +424,6 @@ function niceTop(m) {
   var d = Math.ceil(m / k);
   return d * k;
 }
-function tickStep(top) {
-  var divs = [4, 5, 3, 2];
-  for (var i = 0; i < divs.length; i++) {
-    var st = top / divs[i];
-    if (st === Math.floor(st)) return st;
-  }
-  return top / 4;
-}
 function fmtHour(h) { var ap = h < 12 ? "AM" : "PM"; var v = h % 12; if (v === 0) v = 12; return v + " " + ap; }
 function fmtClock(i) {                       /* fractional hour column -> "10:13am" */
   var h = Math.floor(i) % 24, m = Math.round((i - Math.floor(i)) * 60);
@@ -440,7 +437,7 @@ function aqiWord(v) {
          v <= 200 ? "unhealthy" : v <= 300 ? "very unhealthy" : "hazardous";
 }
 function uvWord(v) { return v < 3 ? "low" : v < 6 ? "moderate" : v < 8 ? "high" : v < 11 ? "very high" : "extreme"; }
-function sgnFt(v) { return (v >= 0 ? "+" : "") + v.toFixed(1); }   /* tide heights always signed */
+function sgnFt(v) { var t = v.toFixed(1); if (t === "-0.0") t = "0.0"; return (t.charAt(0) === "-" ? "" : "+") + t; }   /* tide heights always signed; -0.04 is +0.0 */
 function uvColor(v) { return v < 3 ? "#3e8e41" : v < 6 ? "#c08a12" : v < 8 ? "#e07408" : v < 11 ? "#cf3049" : "#8f4bab"; }
 
 /* WMO weather code + cloud % -> icon and wording for the day strip */
@@ -483,14 +480,15 @@ function linePath(vals, yFn, step) {
 function areaPath(vals, yFn, floorY) {
   var d = "", start = -1, last = -1;
   var i0 = Math.max(0, VIEW0 - 1), i1 = Math.min(vals.length, VIEW0 + VIEWH + 1);
+  var close = function () { if (start >= 0) d += "L" + x(last).toFixed(1) + "," + floorY + "Z"; start = -1; };
   for (var i = i0; i < i1; i++) {
     var v = vals[i];
-    if (v === null || v === undefined) continue;
+    if (v === null || v === undefined) { close(); continue; }   /* interior gap: end the fill, never bridge it */
     if (start < 0) { start = i; d += "M" + x(i).toFixed(1) + "," + floorY + "L"; }
     d += x(i).toFixed(1) + "," + yFn(v).toFixed(1) + " ";
     last = i;
   }
-  if (start >= 0) d += "L" + x(last).toFixed(1) + "," + floorY + "Z";   /* close at real data, not the axis end */
+  close();                                     /* close at real data, not the axis end */
   return d;
 }
 
@@ -519,7 +517,7 @@ function loadForecast() {
     api({ forecast_days: DAYSN, hourly: "precipitation_probability,visibility,uv_index", daily: "sunrise,sunset",
           current: "temperature_2m,apparent_temperature,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m,is_day" }),
     api({ models: "gfs_hrrr", forecast_days: 3,
-          hourly: "temperature_2m,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m" })
+          hourly: "temperature_2m,cloud_cover,wind_speed_10m,wind_direction_10m" })
       .catch(function () { return null; }),                     /* overlay is optional; page works without it */
     fetch("https://marine-api.open-meteo.com/v1/marine?latitude=" + loc.lat + "&longitude=" + loc.lon +
           "&hourly=sea_surface_temperature&timezone=auto&temperature_unit=fahrenheit&forecast_days=" + DAYSN)
@@ -536,6 +534,8 @@ function loadForecast() {
     loadTides();                              /* NOAA data arrives later and re-renders */
   }).catch(function (e) {
     if (token !== fetchToken) return;
+    renderTitle();                           /* recents already show the new city: keep the h1/tab honest too */
+    document.title = locLabel(loc, true) + " \u00b7 Weather Chart";
     $("status").innerHTML = '<span class="err">Could not load the forecast (' + esc(e.message) +
       ').</span><button onclick="loadForecast()">Try again</button>';
     setLoading(false);
@@ -682,7 +682,7 @@ function build(ec, pr, hr, mar, aq) {
     if (pr.hourly.uv_index) uv[pi] = pr.hourly.uv_index[p];
   }
   var hrrr = { temp: new Array(times.length).fill(null), cloud: new Array(times.length).fill(null),
-               wspd: new Array(times.length).fill(null), wgst: new Array(times.length).fill(null),
+               wspd: new Array(times.length).fill(null),
                wdir: new Array(times.length).fill(null), any: false };
   if (hr && hr.hourly) for (var q = 0; q < hr.hourly.time.length; q++) {
     var qi = byTime[hr.hourly.time[q]];
@@ -690,7 +690,6 @@ function build(ec, pr, hr, mar, aq) {
     hrrr.temp[qi] = hr.hourly.temperature_2m[q];
     hrrr.cloud[qi] = hr.hourly.cloud_cover[q];
     hrrr.wspd[qi] = hr.hourly.wind_speed_10m[q];
-    hrrr.wgst[qi] = hr.hourly.wind_gusts_10m[q];
     hrrr.wdir[qi] = hr.hourly.wind_direction_10m[q];
     hrrr.any = true;
   }
@@ -721,8 +720,11 @@ function build(ec, pr, hr, mar, aq) {
     var slice = { codes: [], clouds: [], hi: -999, lo: 999, psum: 0, uvx: null };
     for (var j = d; j < Math.min(d + 24, times.length); j++) {
       var hh = j - d;
-      slice.hi = Math.max(slice.hi, h.temperature_2m[j]);
-      slice.lo = Math.min(slice.lo, h.temperature_2m[j]);
+      var tv = h.temperature_2m[j];
+      if (tv !== null && tv !== undefined) {   /* Math.min(x, null) is 0: a null tail hour must not fake a 0 low */
+        slice.hi = Math.max(slice.hi, tv);
+        slice.lo = Math.min(slice.lo, tv);
+      }
       slice.psum += (h.precipitation[j] || 0);
       if (uv[j] !== null && (slice.uvx === null || uv[j] > slice.uvx)) slice.uvx = uv[j];
       if (hh >= 8 && hh <= 20) { slice.codes.push(h.weather_code[j]); slice.clouds.push(h.cloud_cover[j]); }
@@ -893,8 +895,8 @@ function render() {
   /* ---- temperature ---- */
   var tmin = 999, tmax = -999;
   for (i = 0; i < HOURS; i++) {
-    tmin = Math.min(tmin, data.temp[i], data.feels[i]);
-    tmax = Math.max(tmax, data.temp[i], data.feels[i]);
+    if (data.temp[i] !== null && data.temp[i] !== undefined) { tmin = Math.min(tmin, data.temp[i]); tmax = Math.max(tmax, data.temp[i]); }
+    if (data.feels[i] !== null && data.feels[i] !== undefined) { tmin = Math.min(tmin, data.feels[i]); tmax = Math.max(tmax, data.feels[i]); }
   }
   var tlo = Math.floor((tmin - 3) / 10) * 10, thi = Math.ceil((tmax + 3) / 10) * 10;
   var yT = function (v) { return SEC.temp.y + SEC.temp.h * (1 - (v - tlo) / (thi - tlo)); };
@@ -954,12 +956,14 @@ function render() {
     /* a line, not a filled area: visibility sits pinned at the top most of the time */
     s.push('<path d="' + linePath(data.vis.map(function (v) { return v === null ? null : Math.min(v, VMAX); }), yV) +
            '" fill="none" stroke="' + COL.visLine + '" stroke-width="2"' + CP + '/>');
-    if (data.aqi && data.aqi.some(function (v) { return v !== null; })) {   /* smoke and air quality overlay */
+    var hasAqi = data.aqi && data.aqi.some(function (v) { return v !== null; });
+    if (hasAqi) {   /* smoke and air quality overlay */
       var yQ = function (v) { return SEC.vis.y + SEC.vis.h * (1 - Math.min(v, 200) / 200); };
       s.push('<path d="' + linePath(data.aqi, yQ) + '" fill="none" stroke="' + COL.aqi + '" stroke-width="1.6" stroke-dasharray="5 3"' + CP + '/>');
     }
-    legend(s, SEC.vis, [[COL.visLine, "Visibility (miles, 10 = clear)"], [COL.fogBand, "Fog (under 1 mi)"],
-                        [COL.aqi, "Air Quality (US AQI, 0-200 scale)", true]]);
+    var visLeg = [[COL.visLine, "Visibility (miles, 10 = clear)"], [COL.fogBand, "Fog (under 1 mi)"]];
+    if (hasAqi) visLeg.push([COL.aqi, "Air Quality (US AQI, 0-200 scale)", true]);   /* no line, no legend */
+    legend(s, SEC.vis, visLeg);
   } else {
     s.push('<text x="' + (PADL + PLOTW / 2) + '" y="' + (SEC.vis.y + SEC.vis.h / 2) +
            '" text-anchor="middle" font-size="13" fill="#9aa3ac">No visibility data for this location</text>');
@@ -1030,7 +1034,7 @@ function render() {
 
   /* "now" marker */
   if (data.nowIdx !== null && data.nowIdx >= VIEW0 && data.nowIdx < VIEW0 + VIEWH) {
-    var nx = x(data.nowIdx);
+    var nx = xb(data.nowFrac);               /* exact minutes, not the hour column's center */
     s.push('<line x1="' + nx + '" y1="' + SEC.days.h + '" x2="' + nx + '" y2="' + BOTTOM + '" stroke="' + COL.now + '" stroke-width="1.4"/>');
   }
 
@@ -1077,12 +1081,16 @@ function render() {
 
   /* stacked legends (phones) hug the right edge of the plot per Ken 2026-08-18: the block is
      drawn left-aligned (swatch column + ragged text), then shifted right by measured width */
-  Array.prototype.forEach.call(document.querySelectorAll("#chart .lgstack"), function (g) {
+  var lgs = document.querySelectorAll("#chart .lgstack"), lgw = [];
+  Array.prototype.forEach.call(lgs, function (g) {          /* pass 1: all the layout reads */
     var right = 0;
     Array.prototype.forEach.call(g.querySelectorAll("text"), function (t) {
       right = Math.max(right, +t.getAttribute("x") + t.getComputedTextLength());
     });
-    if (right) g.setAttribute("transform", "translate(" + Math.max(0, W - PADR - right).toFixed(1) + ",0)");
+    lgw.push(right);
+  });
+  Array.prototype.forEach.call(lgs, function (g, gi) {      /* pass 2: all the writes */
+    if (lgw[gi]) g.setAttribute("transform", "translate(" + Math.max(0, W - PADR - lgw[gi]).toFixed(1) + ",0)");
   });
 
   bindPointer();
@@ -1215,22 +1223,26 @@ function bindPointer() {
     return Math.max(VIEW0, Math.min(Math.min(HOURS, VIEW0 + VIEWH) - 1,
            VIEW0 + Math.round((px - PADL) / PLOTW * VIEWH - 0.5)));
   }
+  var mvI = null, mvH = 0;                     /* rebuild the card only when the hovered hour changes */
   function move(ev) {                          /* desktop hover: card rides the pointer */
     if (resizing || dragging) return;          /* no tooltip while dragging a grip or reordering */
     var r = svg.getBoundingClientRect();
     var px = ev.clientX - r.left, py = ev.clientY - r.top;
     if (px < PADL - 4 || px > W - PADR + 4 || py < SEC.days.h || py > BOTTOM) { hide(); return; }
     var i = hourAt(px);
-    xh.setAttribute("x1", x(i)); xh.setAttribute("x2", x(i)); xh.setAttribute("opacity", "1");
-    tip.innerHTML = tipHTML(i);
-    tip.style.display = "block";
-    var tw = tip.offsetWidth, th = tip.offsetHeight;
-    var lx = x(i) + 14;
-    if (lx + tw > W - 4) lx = x(i) - tw - 14;
-    tip.style.left = lx + "px";
-    tip.style.top = Math.max(SEC.days.h + 6, Math.min(py - 20, BOTTOM - th - 4)) + "px";
+    if (i !== mvI) {
+      mvI = i;
+      xh.setAttribute("x1", x(i)); xh.setAttribute("x2", x(i)); xh.setAttribute("opacity", "1");
+      tip.innerHTML = tipHTML(i);
+      tip.style.display = "block";
+      var tw = tip.offsetWidth; mvH = tip.offsetHeight;
+      var lx = x(i) + 14;
+      if (lx + tw > W - 4) lx = x(i) - tw - 14;
+      tip.style.left = lx + "px";
+    }
+    tip.style.top = Math.max(SEC.days.h + 6, Math.min(py - 20, BOTTOM - mvH - 4)) + "px";
   }
-  function hide() { tip.style.display = "none"; xh.setAttribute("opacity", "0"); }
+  function hide() { mvI = null; tip.style.display = "none"; xh.setAttribute("opacity", "0"); }
   function setLine(i) {                        /* daily mode: crosshair + small time chip */
     mobTip.i = i;
     xh.setAttribute("x1", x(i)); xh.setAttribute("x2", x(i)); xh.setAttribute("opacity", "1");
@@ -1344,6 +1356,11 @@ document.addEventListener("DOMContentLoaded", function () {
 /* ---------- resize + reorder drags (window-level so re-renders mid-drag don't drop them) ---------- */
 var resizing = null, dragging = null, resizeRaf = 0;
 window.addEventListener("pointermove", function (ev) {
+  if ((dragging || resizing) && ev.buttons === 0) {   /* released outside the window: end it like pointerup */
+    if (resizing) { resizing = null; save("bw_sizes", sizes); render(); }
+    if (dragging) { dragging = null; save("bw_order", order); render(); }
+    return;
+  }
   if (dragging) {                             /* reorder: swap when the pointer enters another row */
     var svg = $("wx");
     if (!svg) return;
@@ -1402,6 +1419,7 @@ function loadLeaflet() {
 }
 function openMap() {
   $("mapwrap").className = "on";
+  $("mapwrap").querySelector(".x").focus();  /* keyboard users land inside the modal, not behind it */
   $("mapsel").textContent = "Loading map…";
   $("mapuse").disabled = true;
   mapPick = null;
@@ -1528,17 +1546,29 @@ function renderRecents() {
     var row = document.createElement("div");
     row.className = "row" + (sameLoc(r, loc) ? " active" : "");
     row.title = locLabel(r);
+    row.tabIndex = 0;                        /* keyboard: Tab to a row, Enter/Space selects; the DOM shape is
+                                                unchanged (role on a div beats restyling real nested buttons) */
+    row.setAttribute("role", "button");
     var b = document.createElement("b"); b.textContent = locLabel(r, true); row.appendChild(b);
     if (r.admin1) { var sub = document.createElement("span"); sub.className = "sub"; sub.textContent = admin1Label(r); row.appendChild(sub); }
     var rm = document.createElement("span"); rm.className = "rm"; rm.textContent = "×"; rm.title = "Remove";
-    rm.addEventListener("click", function (ev) {
+    rm.tabIndex = 0;
+    rm.setAttribute("role", "button");
+    rm.setAttribute("aria-label", "Remove " + locLabel(r, true));   /* bare × announces as 'multiplication sign' */
+    var removeIt = function (ev) {
       ev.stopPropagation();
       recents.splice(idx, 1); save("bw_recents", recents); renderRecents();
-    });
+    };
+    rm.addEventListener("click", removeIt);
+    rm.addEventListener("keydown", function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); removeIt(ev); } });
     row.appendChild(rm);
-    row.addEventListener("click", function () {
+    var pickIt = function () {
       $("recmenu").hidden = true;
       if (!sameLoc(r, loc)) setLocation(r);
+    };
+    row.addEventListener("click", pickIt);
+    row.addEventListener("keydown", function (ev) {
+      if (ev.target === row && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); pickIt(); }
     });
     host.appendChild(row);
   });

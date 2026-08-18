@@ -53,12 +53,12 @@
   #mapwrap { position: fixed; inset: 0; z-index: 60; background: rgba(20,28,36,.55); display: none;
              align-items: center; justify-content: center; padding: 20px; }
   #mapwrap.on { display: flex; }
-  .mapcard { background: #fff; border-radius: 10px; width: min(900px, 96vw); max-height: 92vh; display: flex;
+  .mapcard { background: #fff; border-radius: 10px; width: min(900px, 96vw); max-height: 92vh; max-height: min(92vh, 92dvh); display: flex;
              flex-direction: column; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,.3); }
   .maphead { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #e4e9ee; }
   .maphead h2 { font-size: 16px; font-weight: 600; flex: 1; }
   .maphead .x { border: none; background: none; font-size: 24px; line-height: 1; cursor: pointer; color: #8a939c; padding: 0 4px; }
-  #mapbox { flex: 1; min-height: 60vh; cursor: crosshair; }
+  #mapbox { flex: 1; min-height: 60vh; min-height: min(60vh, 60dvh); cursor: crosshair; }
   .mapfoot { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid #e4e9ee; }
   .mapfoot .sel { flex: 1; font-size: 13.5px; color: #444; }
   .mapfoot .use { padding: 8px 14px; font-size: 14px; border: 1px solid #1976d2; background: #1976d2; color: #fff;
@@ -67,6 +67,7 @@
   #q { flex: 1; min-width: 0; padding: 8px 10px; font-size: 14px; border: 1px solid #c5ccd4; border-radius: 6px; outline: none; }
   @media (max-width: 600px) { #q { font-size: 16px; } }  /* under 16px iOS Safari zooms the page on focus and leaves it zoomed */
   #q:focus { border-color: #1976d2; }
+  #q:focus-visible { outline: 2px solid #1976d2; outline-offset: 1px; }
   #pagenav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
   #pagenav a, #pagenav .here { padding: 8px 12px; font-size: 14px; font-weight: 600; line-height: 16px; border-radius: 6px; white-space: nowrap; }
   #pagenav a { color: #1976d2; text-decoration: none; border: 1px solid #c5ccd4; background: #fff; }
@@ -82,7 +83,7 @@
   #results { position: absolute; top: 100%; left: 0; right: 0; z-index: 30; background: #fff; border: 1px solid #c5ccd4;
              border-radius: 0 0 6px 6px; box-shadow: 0 6px 16px rgba(0,0,0,.12); max-height: 240px; overflow-y: auto; }
   #results div { padding: 8px 10px; font-size: 13px; cursor: pointer; }
-  #results div:hover, #results div.sel { background: #eaf3fc; }
+  #results div:hover { background: #eaf3fc; }
   #results .none { color: #999; cursor: default; }
 
   #recrow { display: flex; gap: 8px; margin-top: 8px; }
@@ -99,9 +100,10 @@
   #recmenu .row b { font-weight: inherit; flex: 1; }
   #recmenu .row .sub { color: #6b7683; font-size: 12px; }
   #recmenu .row .rm { color: #6b7683; font-size: 14px; line-height: 1; padding: 1px 4px; border-radius: 8px; }
+  #recmenu .row:focus-visible, #recmenu .row .rm:focus-visible { outline: 2px solid #1976d2; outline-offset: -2px; }
   #recmenu .row .rm:hover { background: #d9dee4; color: #555; }
 
-  #status { font-size: 13px; color: #888; padding: 8px 2px; min-height: 20px; }
+  #status { font-size: 13px; color: #6e6e6e; padding: 8px 2px; min-height: 20px; }
   #status .err { color: #c0392b; }
   #status button { margin-left: 8px; font-size: 12.5px; cursor: pointer; }
 
@@ -125,7 +127,7 @@
   #tipback { position: fixed; inset: 0; z-index: 55; background: rgba(15,23,32,.35); display: none; }
   #tipback.on { display: block; }
   #tip.cardmode { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 56;
-                  pointer-events: auto; white-space: normal; width: min(92vw, 430px); max-height: 82vh;
+                  pointer-events: auto; white-space: normal; width: min(92vw, 430px); max-height: 82vh; max-height: min(82vh, 82dvh);
                   overflow-y: auto; font-size: 17px; }
   #dragchip { position: absolute; display: none; z-index: 18; transform: translateX(-50%); background: #fff;
               border: 1px solid #f6a04d; border-radius: 10px; padding: 2px 9px; font-size: 12.5px; font-weight: 600;
@@ -152,7 +154,7 @@
         <div class="searchrow">
           <input id="q" type="text" placeholder="Add location (city or town)…" autocomplete="off" spellcheck="false">
           <button class="mapbtn" onclick="openMap()">Use Map</button>
-          <button class="mapbtn gps" onclick="useMyLocation()" title="Use my current location"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><line x1="12" y1="1" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="1" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="23" y2="12"/></svg></button>
+          <button class="mapbtn gps" onclick="useMyLocation()" title="Use my current location" aria-label="Use my current location"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><line x1="12" y1="1" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="1" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="23" y2="12"/></svg></button>
         </div>
         <div id="results" style="display:none"></div>
         <div id="recrow">
@@ -160,7 +162,7 @@
             <button id="recbtn" onclick="toggleRecents()" title="Recent locations"><span id="recbtnlabel"></span><span class="caret">▼</span></button>
             <div id="recmenu" hidden></div>
           </div>
-          <button class="mapbtn gps" id="sharebtn" onclick="share()" title="Copy a link to this view"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>
+          <button class="mapbtn gps" id="sharebtn" onclick="share()" title="Copy a link to this view" aria-label="Share this view"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>
         </div>
       </div>
     </header>
@@ -182,7 +184,7 @@
 
 <div id="mapwrap" onclick="if (event.target === this) closeMap()">
   <div class="mapcard">
-    <div class="maphead"><h2>Pick a spot on the map</h2><button class="x" onclick="closeMap()" title="Close">×</button></div>
+    <div class="maphead"><h2>Pick a spot on the map</h2><button class="x" onclick="closeMap()" title="Close" aria-label="Close">×</button></div>
     <div id="mapbox"></div>
     <div class="mapfoot">
       <div class="sel" id="mapsel">Click anywhere on the map to choose a location.</div>
@@ -393,7 +395,7 @@ function loadAverages(force) {
     setLoading(false);
   }).catch(function (e) {
     if (tok !== fetchToken) return;
-    setStatus('<span class="err">Could not load history (' + esc(e.message) + ').</span> <button onclick="loadAverages(true)">retry</button>');
+    setStatus('<span class="err">Could not load history (' + esc(e.message) + ').</span> <button onclick="loadAverages(true)">Try again</button>');
     setLoading(false);
   });
 }
@@ -541,12 +543,16 @@ function render() {
 
   /* stacked legends (phones) hug the right edge of the plot per Ken 2026-08-18: the block is
      drawn left-aligned (swatch column + ragged text), then shifted right by measured width */
-  Array.prototype.forEach.call(document.querySelectorAll("#chart .lgstack"), function (g) {
+  var lgs = document.querySelectorAll("#chart .lgstack"), lgw = [];
+  Array.prototype.forEach.call(lgs, function (g) {          /* pass 1: all the layout reads */
     var right = 0;
     Array.prototype.forEach.call(g.querySelectorAll("text"), function (t) {
       right = Math.max(right, +t.getAttribute("x") + t.getComputedTextLength());
     });
-    if (right) g.setAttribute("transform", "translate(" + Math.max(0, W - PADR - right).toFixed(1) + ",0)");
+    lgw.push(right);
+  });
+  Array.prototype.forEach.call(lgs, function (g, gi) {      /* pass 2: all the writes */
+    if (lgw[gi]) g.setAttribute("transform", "translate(" + Math.max(0, W - PADR - lgw[gi]).toFixed(1) + ",0)");
   });
 
   bindPointer();
@@ -626,21 +632,25 @@ function bindPointer() {
   function dayAt(px) {                         /* pixel column -> day-of-year index */
     return Math.max(0, Math.min(DAYS - 1, Math.round((px - PADL) / PLOTW * DAYS - 0.5)));
   }
+  var mvI = null, mvH = 0;                     /* rebuild the card only when the hovered day changes */
   function move(ev) {                          /* desktop hover: card rides the pointer */
     var r = svg.getBoundingClientRect();
     var px = ev.clientX - r.left, py = ev.clientY - r.top;
     if (px < PADL - 4 || px > W - PADR + 4 || py < SEC.temp.y || py > BOTTOM) { hide(); return; }
     var d = dayAt(px);
-    xh.setAttribute("x1", x(d)); xh.setAttribute("x2", x(d)); xh.setAttribute("opacity", "1");
-    tip.innerHTML = tipHTML(d);
-    tip.style.display = "block";
-    var tw = tip.offsetWidth, th = tip.offsetHeight;
-    var lx = x(d) + 14;
-    if (lx + tw > W - 4) lx = x(d) - tw - 14;
-    tip.style.left = lx + "px";
-    tip.style.top = Math.max(SEC.temp.y + 6, Math.min(py - 20, BOTTOM - th - 4)) + "px";
+    if (d !== mvI) {
+      mvI = d;
+      xh.setAttribute("x1", x(d)); xh.setAttribute("x2", x(d)); xh.setAttribute("opacity", "1");
+      tip.innerHTML = tipHTML(d);
+      tip.style.display = "block";
+      var tw = tip.offsetWidth; mvH = tip.offsetHeight;
+      var lx = x(d) + 14;
+      if (lx + tw > W - 4) lx = x(d) - tw - 14;
+      tip.style.left = lx + "px";
+    }
+    tip.style.top = Math.max(SEC.temp.y + 6, Math.min(py - 20, BOTTOM - mvH - 4)) + "px";
   }
-  function hide() { tip.style.display = "none"; xh.setAttribute("opacity", "0"); }
+  function hide() { mvI = null; tip.style.display = "none"; xh.setAttribute("opacity", "0"); }
   function setLine(d) {                        /* phones: crosshair + small date chip */
     mobTip.i = d;
     xh.setAttribute("x1", x(d)); xh.setAttribute("x2", x(d)); xh.setAttribute("opacity", "1");
@@ -696,7 +706,7 @@ if (mqPhone && mqPhone.addEventListener) mqPhone.addEventListener("change", func
 });
 
 /* ---------- map picker (Leaflet + OpenStreetMap tiles: free, no key, no account) ---------- */
-var lmap = null, lmark = null, mapPick = null;
+var lmap = null, lmark = null, mapPick = null, tideListP = null;   /* tideListP: one station-file fetch per session */
 /* Leaflet is self-hosted under /vendor/leaflet/ rather than pulled from a CDN. It is the only
    third-party CODE this site loads (everything else it fetches is data, which the page treats
    as values), so a compromised CDN would have run with full access to this origin: the DOM,
@@ -719,6 +729,7 @@ function loadLeaflet() {
 }
 function openMap() {
   $("mapwrap").className = "on";
+  $("mapwrap").querySelector(".x").focus();  /* keyboard users land inside the modal, not behind it */
   $("mapsel").textContent = "Loading map…";
   $("mapuse").disabled = true;
   mapPick = null;
@@ -794,7 +805,7 @@ function nameWaterSpot(pk, lat, lon, a, coords) {
       if (!water && place) { pk.name = place; done(); return; }
       if (water) {
         pk.name = water;
-        return fetch("/data/tide-stations.json").then(function (r2) { return r2.json(); }).then(function (list) {
+        return (tideListP || (tideListP = fetch("/data/tide-stations.json").then(function (r2) { return r2.json(); }))).then(function (list) {
           var best = null, bd = 1e18, dy, dx, d2, k;
           for (k = 0; k < list.length; k++) {
             dy = (list[k][2] - lat) * 69; dx = (list[k][3] - lon) * 69 * Math.cos(lat * Math.PI / 180);
@@ -844,17 +855,29 @@ function renderRecents() {
     var row = document.createElement("div");
     row.className = "row" + (sameLoc(r, loc) ? " active" : "");
     row.title = locLabel(r);
+    row.tabIndex = 0;                        /* keyboard: Tab to a row, Enter/Space selects; the DOM shape is
+                                                unchanged (role on a div beats restyling real nested buttons) */
+    row.setAttribute("role", "button");
     var b = document.createElement("b"); b.textContent = locLabel(r, true); row.appendChild(b);
     if (r.admin1) { var sub = document.createElement("span"); sub.className = "sub"; sub.textContent = admin1Label(r); row.appendChild(sub); }
     var rm = document.createElement("span"); rm.className = "rm"; rm.textContent = "×"; rm.title = "Remove";
-    rm.addEventListener("click", function (ev) {
+    rm.tabIndex = 0;
+    rm.setAttribute("role", "button");
+    rm.setAttribute("aria-label", "Remove " + locLabel(r, true));   /* bare × announces as 'multiplication sign' */
+    var removeIt = function (ev) {
       ev.stopPropagation();
       recents.splice(idx, 1); save("bw_recents", recents); renderRecents();
-    });
+    };
+    rm.addEventListener("click", removeIt);
+    rm.addEventListener("keydown", function (ev) { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); removeIt(ev); } });
     row.appendChild(rm);
-    row.addEventListener("click", function () {
+    var pickIt = function () {
       $("recmenu").hidden = true;
       if (!sameLoc(r, loc)) selectLoc(r);
+    };
+    row.addEventListener("click", pickIt);
+    row.addEventListener("keydown", function (ev) {
+      if (ev.target === row && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); pickIt(); }
     });
     host.appendChild(row);
   });
@@ -894,7 +917,7 @@ $("q").addEventListener("input", function () {
   clearTimeout(searchTimer);
   var q = this.value.trim();
   if (q.length < 2) { $("results").style.display = "none"; return; }
-  searchTimer = setTimeout(function () { geocode(q); }, 350);
+  searchTimer = setTimeout(function () { geocode(q); }, 320);
 });
 $("q").addEventListener("keydown", function (ev) {
   if (ev.key === "Escape") { $("results").style.display = "none"; }
