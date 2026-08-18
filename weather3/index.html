@@ -60,6 +60,14 @@
   #pagenav .here { color: #fff; background: #1976d2; border: 1px solid #1976d2; cursor: default; }
   #pagenav .daily { display: none; }          /* phones swap the two forecast buttons for one Daily button */
   @media (max-width: 600px) {                 /* phones: "Daily · Historical", equal-width buttons spanning the page */
+    /* NOW card on the true screen center: drop the plot-center shift, stop item min-content
+       widths from growing the shared grid track (which hung all the overflow off the right),
+       and trim the card so it fits a phone column; residual overflow spills symmetrically */
+    header > * { min-width: 0; }
+    #nowbox { transform: none; }
+    .nowcard { padding: 8px 10px; gap: 9px; }
+    #nowbox .nicon { font-size: 34px; }
+    #nowbox .ntemp { font-size: 31px; }
     #pagenav { width: 100%; }
     #pagenav a[href^="/weather3/"], #pagenav a[href^="/weather10/"], #pagenav .here:not(.daily) { display: none; }
     #pagenav .daily { display: block; }

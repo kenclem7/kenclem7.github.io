@@ -94,6 +94,19 @@
          border-radius: 8px; box-shadow: 0 3px 10px rgba(0,0,0,.15); padding: 11px 15px; font-size: 19px; line-height: 1.5;
          pointer-events: none; white-space: nowrap; }
   #tip .t { font-weight: 600; }
+  /* phones: tap-to-read card centered on the screen + drag chip on the crosshair (same as the forecast pages) */
+  #tipback { position: fixed; inset: 0; z-index: 55; background: rgba(15,23,32,.35); display: none; }
+  #tipback.on { display: block; }
+  #tip.cardmode { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 56;
+                  pointer-events: auto; white-space: normal; width: min(92vw, 430px); max-height: 82vh;
+                  overflow-y: auto; font-size: 17px; }
+  #dragchip { position: absolute; display: none; z-index: 18; transform: translateX(-50%); background: #fff;
+              border: 1px solid #f6a04d; border-radius: 10px; padding: 2px 9px; font-size: 12.5px; font-weight: 600;
+              color: #333; pointer-events: none; white-space: nowrap; }
+  @media (max-width: 600px) {
+    #chart svg { touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+    .chartbox { width: auto; }
+  }
   .foot { font-size: 11.5px; color: #98a2ad; padding: 10px 2px 6px; }
   .foot a { color: #1976d2; text-decoration: none; }
   .foot a:hover { text-decoration: underline; }
@@ -126,12 +139,15 @@
       <div class="chartbox" id="chartbox">
         <div id="loading"><div class="spin"></div></div>
         <div id="tip"></div>
+        <div id="dragchip"></div>
         <div id="chart"></div>
       </div>
     </div>
     <div class="foot">Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> · ERA5 historical reanalysis · daily averages over the last 10 full years (2016-2025), Feb 29 excluded</div>
   </div>
 </div>
+
+<div id="tipback"></div>
 
 <div id="mapwrap" onclick="if (event.target === this) closeMap()">
   <div class="mapcard">
@@ -153,11 +169,16 @@ var MDAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 var MNAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 var MSTART = (function () { var a = [0], i; for (i = 0; i < 12; i++) a.push(a[i] + MDAYS[i]); return a; })();
 var W, PLOTW, SEC, BOTTOM, SVGH;
+/* phones (under 600px): the chart fits the screen (no sideways scroll), so a horizontal drag
+   can move the crosshair and a tap opens the reading card - same method as the forecast pages */
+var mqPhone = window.matchMedia ? window.matchMedia("(max-width: 600px)") : null;
+var PHONE = false;
 function applyLayout() {
   var scr = document.querySelector(".scroller");
+  PHONE = !!(mqPhone && mqPhone.matches);
   /* -2px slack: at fractional display scaling an exact-width chart can leave a sub-pixel
      overflow that renders a useless scrollbar */
-  W = Math.max(900, (scr ? scr.clientWidth : 0) - 2);
+  W = Math.max(PHONE ? 300 : 900, (scr ? scr.clientWidth : 0) - 2);
   PLOTW = W - PADL - PADR;
   SEC = { temp: { y: 8, h: 280 } };
   SEC.precip = { y: SEC.temp.y + SEC.temp.h + 66, h: 200 };
@@ -338,7 +359,8 @@ function render() {
   [SEC.temp, SEC.precip].forEach(function (sec) {
     for (m = 0; m < 12; m++) {
       if (m % 2 === 1) s.push('<rect x="' + xb(MSTART[m]).toFixed(1) + '" y="' + sec.y + '" width="' + (MDAYS[m] / DAYS * PLOTW).toFixed(1) + '" height="' + sec.h + '" fill="' + COL.band + '"/>');
-      s.push('<text x="' + ((xb(MSTART[m]) + xb(MSTART[m + 1])) / 2).toFixed(1) + '" y="' + (sec.y + sec.h + 15) + '" text-anchor="middle" font-size="11" fill="#667">' + MNAMES[m] + "</text>");
+      /* phones: single-letter month labels, the full names collide in narrow columns */
+      s.push('<text x="' + ((xb(MSTART[m]) + xb(MSTART[m + 1])) / 2).toFixed(1) + '" y="' + (sec.y + sec.h + 15) + '" text-anchor="middle" font-size="11" fill="#667">' + (PHONE ? MNAMES[m].charAt(0) : MNAMES[m]) + "</text>");
     }
     for (m = 0; m <= 12; m++) {
       s.push('<line x1="' + xb(MSTART[m]).toFixed(1) + '" y1="' + sec.y + '" x2="' + xb(MSTART[m]).toFixed(1) + '" y2="' + (sec.y + sec.h) + '" stroke="' + COL.monthline + '" stroke-width="1"/>');
@@ -436,43 +458,75 @@ function render() {
     ' · <button id="sharebtn" title="Copy a link to this view" onclick="share()">share</button>' +
     ' · <button title="Re-fetch" onclick="loadAverages(true)">⟳ refresh</button>';
   renderRecents();
+  if (!PHONE) closeCard();                     /* leaving phone mode dismisses the reading card */
   var scr = document.querySelector(".scroller");
-  if (scr && Math.max(900, scr.clientWidth - 2) !== W && !inRefit) {
+  if (scr && Math.max(PHONE ? 300 : 900, scr.clientWidth - 2) !== W && !inRefit) {
     inRefit = true; render(); inRefit = false;
   }
 }
 var inRefit = false;
 
 function legend(s, sec, items) {
-  var y = sec.y + sec.h + 31, xr = W - PADR;
-  for (var i = items.length - 1; i >= 0; i--) {
-    var it = items[i], txtw = it[1].length * 6.1 + 20;
-    xr -= txtw;
+  var y = sec.y + sec.h + 31, xr = W - PADR, total = 0, i, it, txtw;
+  for (i = 0; i < items.length; i++) total += items[i][1].length * 6.1 + 20 + 14;
+  var stack = PHONE && total > W - PADR;      /* narrow phones: one item per line, left-aligned, natural order */
+  if (stack) y = sec.y + sec.h + 27;          /* tighter lines so four items clear the next section */
+  for (var n = 0; n < items.length; n++) {
+    i = stack ? n : items.length - 1 - n;
+    it = items[i]; txtw = it[1].length * 6.1 + 20;
+    xr = stack ? 2 : xr - txtw;
     s.push('<rect x="' + xr + '" y="' + (y - 9) + '" width="12" height="9" fill="' + it[0] + '"/>');
     s.push('<text x="' + (xr + 16) + '" y="' + y + '" font-size="11" fill="#555">' + it[1] + "</text>");
-    xr -= 14;
+    if (stack) y += 12.5;
+    else xr -= 14;
   }
 }
 
 /* ---------- tooltip ---------- */
+/* the reading for one date: shared by the desktop hover card and the phone tap card */
+function tipHTML(d) {
+  var md = doyToMD(d), mn = MNAMES[md[0]];
+  return '<div class="t">' + mn + " " + md[1] + " · avg of " + YEARS_LABEL + "</div>" +
+    "🌡️ high " + (data.hi[d] === null ? "–" : Math.round(data.hi[d]) + "°F") +
+    " · low " + (data.lo[d] === null ? "–" : Math.round(data.lo[d]) + "°F") + "<br>" +
+    (data.rh && data.rh[d] !== null && data.rl && data.rl[d] !== null ?
+      "▲ " + Math.round(data.rh[d]) + "° highest" + (data.rhy && data.rhy[d] ? " (" + data.rhy[d] + ")" : "") +
+      " · ▼ " + Math.round(data.rl[d]) + "° lowest" + (data.rly && data.rly[d] ? " (" + data.rly[d] + ")" : "") + "<br>" : "") +
+    "💧 " + (data.p[d] === null ? "–" : fmtIn(data.p[d]) + " in this day") +
+    " · " + mn + " total " + fmtIn(data.mtot[md[0]], 1) + " in";
+}
+
+/* phone reading card: a drag positions the crosshair, a tap opens the card centered
+   on the screen (over a dim backdrop); tapping anywhere dismisses it */
+var mobTip = { i: null, card: false };
+function openCard(d) {
+  var tip = $("tip");
+  tip.innerHTML = tipHTML(d);
+  tip.className = "cardmode";
+  tip.style.left = ""; tip.style.top = ""; tip.style.display = "block";
+  $("tipback").className = "on";
+  mobTip.card = true;
+}
+function closeCard() {
+  if (!mobTip.card) return;
+  mobTip.card = false;
+  var tip = $("tip");
+  tip.className = ""; tip.style.display = "none";
+  $("tipback").className = "";
+}
+
 function bindPointer() {
-  var svg = $("wx"), tip = $("tip"), xh = $("xh"), box = $("chartbox");
-  function move(ev) {
+  var svg = $("wx"), tip = $("tip"), xh = $("xh"), chip = $("dragchip");
+  function dayAt(px) {                         /* pixel column -> day-of-year index */
+    return Math.max(0, Math.min(DAYS - 1, Math.round((px - PADL) / PLOTW * DAYS - 0.5)));
+  }
+  function move(ev) {                          /* desktop hover: card rides the pointer */
     var r = svg.getBoundingClientRect();
     var px = ev.clientX - r.left, py = ev.clientY - r.top;
     if (px < PADL - 4 || px > W - PADR + 4 || py < SEC.temp.y || py > BOTTOM) { hide(); return; }
-    var d = Math.max(0, Math.min(DAYS - 1, Math.round((px - PADL) / PLOTW * DAYS - 0.5)));
+    var d = dayAt(px);
     xh.setAttribute("x1", x(d)); xh.setAttribute("x2", x(d)); xh.setAttribute("opacity", "1");
-    var md = doyToMD(d), mn = MNAMES[md[0]];
-    var html = '<div class="t">' + mn + " " + md[1] + " · avg of " + YEARS_LABEL + "</div>" +
-      "🌡️ high " + (data.hi[d] === null ? "–" : Math.round(data.hi[d]) + "°F") +
-      " · low " + (data.lo[d] === null ? "–" : Math.round(data.lo[d]) + "°F") + "<br>" +
-      (data.rh && data.rh[d] !== null && data.rl && data.rl[d] !== null ?
-        "▲ " + Math.round(data.rh[d]) + "° highest" + (data.rhy && data.rhy[d] ? " (" + data.rhy[d] + ")" : "") +
-        " · ▼ " + Math.round(data.rl[d]) + "° lowest" + (data.rly && data.rly[d] ? " (" + data.rly[d] + ")" : "") + "<br>" : "") +
-      "💧 " + (data.p[d] === null ? "–" : fmtIn(data.p[d]) + " in this day") +
-      " · " + mn + " total " + fmtIn(data.mtot[md[0]], 1) + " in";
-    tip.innerHTML = html;
+    tip.innerHTML = tipHTML(d);
     tip.style.display = "block";
     var tw = tip.offsetWidth, th = tip.offsetHeight;
     var lx = x(d) + 14;
@@ -481,12 +535,56 @@ function bindPointer() {
     tip.style.top = Math.max(SEC.temp.y + 6, Math.min(py - 20, BOTTOM - th - 4)) + "px";
   }
   function hide() { tip.style.display = "none"; xh.setAttribute("opacity", "0"); }
-  svg.addEventListener("pointermove", move);
-  svg.addEventListener("pointerdown", move);
-  svg.addEventListener("pointerleave", hide);
+  function setLine(d) {                        /* phones: crosshair + small date chip */
+    mobTip.i = d;
+    xh.setAttribute("x1", x(d)); xh.setAttribute("x2", x(d)); xh.setAttribute("opacity", "1");
+    var md = doyToMD(d);
+    chip.textContent = MNAMES[md[0]] + " " + md[1];
+    chip.style.display = "block";
+    chip.style.left = Math.max(PADL + 24, Math.min(W - PADR - 24, x(d))) + "px";
+    chip.style.top = (SEC.temp.y + 6) + "px";
+  }
+  var press = null;                            /* the press being watched for the tap-vs-drag call */
+  svg.addEventListener("pointermove", function (ev) {
+    if (!PHONE) { move(ev); return; }
+    var r = svg.getBoundingClientRect(), px = ev.clientX - r.left, py = ev.clientY - r.top;
+    if (press) {
+      if (Math.abs(ev.clientX - press.x0) > 10) press.moved = true;
+      if (press.moved) setLine(dayAt(px));    /* only a real drag moves the line; tap jitter does not */
+    } else if (ev.pointerType === "mouse" && px > PADL - 5 && px < W - PADR + 5 && py > SEC.temp.y && py < BOTTOM) {
+      setLine(dayAt(px));                      /* a narrow desktop window still gets a live line */
+    }
+  });
+  svg.addEventListener("pointerdown", function (ev) {
+    if (!PHONE) { move(ev); return; }
+    press = { x0: ev.clientX, t0: Date.now(), moved: false };
+    if (svg.setPointerCapture) try { svg.setPointerCapture(ev.pointerId); } catch (e2) {}
+  });
+  svg.addEventListener("pointerup", function (ev) {
+    if (!PHONE || !press) return;
+    var r = svg.getBoundingClientRect(), px = ev.clientX - r.left;
+    var wasTap = !press.moved && Date.now() - press.t0 < 600;
+    press = null;
+    if (!wasTap) return;                       /* a drag just leaves the line in place */
+    /* a tap near the line reads the line's date (a careful drag is not disturbed);
+       a tap elsewhere jumps the line there first */
+    var d = (mobTip.i !== null && Math.abs(x(mobTip.i) - px) <= 30) ? mobTip.i : dayAt(px);
+    setLine(d);
+    openCard(d);
+  });
+  svg.addEventListener("pointercancel", function () { press = null; });   /* vertical pan took the gesture */
+  svg.addEventListener("pointerleave", function () { if (!PHONE) hide(); });
+  /* after a re-render, restore the persisted crosshair, chip and card */
+  if (PHONE && mobTip.i !== null) {
+    setLine(mobTip.i);
+    if (mobTip.card) openCard(mobTip.i);
+  } else chip.style.display = "none";
 }
 var resizeRaf = 0;
 window.addEventListener("resize", function () {
+  if (!resizeRaf) resizeRaf = requestAnimationFrame(function () { resizeRaf = 0; render(); });
+});
+if (mqPhone && mqPhone.addEventListener) mqPhone.addEventListener("change", function () {
   if (!resizeRaf) resizeRaf = requestAnimationFrame(function () { resizeRaf = 0; render(); });
 });
 
@@ -658,6 +756,7 @@ document.addEventListener("keydown", function (ev) {
 function selectLoc(l) {
   loc = l;
   save("bw2_current", loc);
+  closeCard(); mobTip.i = null;                /* a new city starts with a clean crosshair */
   recents = recents.filter(function (r) { return !sameLoc(r, l); });
   recents.unshift(l);
   if (recents.length > 8) recents.length = 8;
@@ -708,6 +807,8 @@ function geocode(q) {
 }
 
 /* ---------- boot ---------- */
+$("tipback").addEventListener("pointerdown", closeCard);   /* tap anywhere dismisses the reading card */
+$("tip").addEventListener("pointerdown", function () { if (mobTip.card) closeCard(); });
 window.__bw2 = { get data() { return data; }, get loc() { return loc; }, get recents() { return recents; } };
 renderRecents();
 loadAverages();
