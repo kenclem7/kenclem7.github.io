@@ -1,0 +1,16 @@
+# Tripwire, not a build: GitHub Pages deploys this repo regardless of what happens here.
+# This exists so a weather10 edit pushed without regenerating weather3 (or a needle the
+# generator can no longer find) turns into a red X on the commit instead of a silently
+# stale 3 Day page. See DESIGN.md section 4.
+name: check
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  weather3-in-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 tools/gen-weather3.py --check
