@@ -487,7 +487,8 @@ function render() {
   });
 
   bindPointer();
-  $("title").textContent = locLabel(loc) + " Average Year (" + YEARS_LABEL + ")";
+  /* the whole phrase is one unbreakable unit (nbsp): a long city wraps BEFORE it */
+  $("title").textContent = locLabel(loc) + " " + ("Average Year (" + YEARS_LABEL + ")").replace(/ /g, "\u00A0");
   document.title = locLabel(loc, true) + " · Average Year";
   var latN = Math.abs(loc.lat).toFixed(2) + "°" + (loc.lat >= 0 ? "N" : "S");
   var lonW = Math.abs(loc.lon).toFixed(2) + "°" + (loc.lon >= 0 ? "E" : "W");
