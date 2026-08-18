@@ -817,7 +817,7 @@ function render() {
           if (cv2 === null || cv2 === undefined || Math.abs(cv2) < 0.4) continue;
           s.push('<g transform="translate(' + x(ci).toFixed(1) + "," + yCur(cv2).toFixed(1) + ") rotate(" +
                  (cv2 >= 0 ? td.cur.fdir : td.cur.edir) + ')">' +
-                 '<path d="M0,-5.4 L3.5,4.6 L0,2.1 L-3.5,4.6 Z" fill="#5a3a80" stroke="#fff" stroke-width="0.5"/></g>');
+                 '<path d="M0,-8.3 L5.3,7 L0,3.2 L-5.3,7 Z" fill="#5a3a80" stroke="#fff" stroke-width="0.7"/></g>');
         }
       }
       tideLegend.push([COL.curLine, "Current (kn, +flood / −ebb, max " + cmax.toFixed(1) + ")"]);
