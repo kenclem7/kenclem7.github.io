@@ -742,7 +742,9 @@ function setTitle(city, tiedPhrase) {
   var el = $("title");
   el.textContent = city + " · " + tiedPhrase;
   el.style.whiteSpace = "nowrap";
-  var fits = el.scrollWidth <= el.clientWidth + 1;
+  var rg = document.createRange();
+  rg.selectNodeContents(el);                   /* fractional widths: integer scrollWidth dropped the bullet a pixel early */
+  var fits = rg.getBoundingClientRect().width <= el.getBoundingClientRect().width + 0.5;
   el.style.whiteSpace = "";
   if (!fits) el.textContent = city + " " + tiedPhrase;
 }
