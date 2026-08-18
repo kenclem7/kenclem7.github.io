@@ -64,9 +64,9 @@
   #recrow { display: flex; gap: 8px; margin-top: 8px; }
   #recwrap { position: relative; flex: 1; min-width: 0; }
   #recbtn { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px;
-            font-size: 14px; border: 1px solid #c5ccd4; border-radius: 6px; background: #fff; cursor: pointer; }
+            font-size: 14px; line-height: 16px; border: 1px solid #c5ccd4; border-radius: 6px; background: #fff; cursor: pointer; }
   #recbtn:hover { border-color: #1976d2; }
-  #recbtn .caret { color: #8a939c; font-size: 12px; }
+  #recbtn .caret { color: #8a939c; font-size: 18px; line-height: 16px; }
   #recmenu { position: absolute; top: 100%; left: 0; right: 0; z-index: 29; background: #fff; border: 1px solid #c5ccd4;
              border-radius: 0 0 6px 6px; box-shadow: 0 6px 16px rgba(0,0,0,.12); max-height: 260px; overflow-y: auto; }
   #recmenu .row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; font-size: 13.5px; cursor: pointer; }
@@ -235,10 +235,19 @@ function share() {
     btn.textContent = "✓";
     setTimeout(function () { btn.innerHTML = icon; }, 1800);
   }
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(url).then(function () { flash("link copied"); },
-                                           function () { window.prompt("Copy this link:", url); });
-  } else window.prompt("Copy this link:", url);
+  function copy() {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function () { flash(); },
+                                             function () { window.prompt("Copy this link:", url); });
+    } else window.prompt("Copy this link:", url);
+  }
+  /* the native share sheet wherever the platform has one; clipboard elsewhere.
+     Cancelling the sheet is not an error; a real failure falls back to copy. */
+  if (navigator.share) {
+    navigator.share({ title: document.title, url: url }).catch(function (e) {
+      if (!e || e.name !== "AbortError") copy();
+    });
+  } else copy();
 }
 function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
 
@@ -666,33 +675,34 @@ function pickOnMap(lat, lon) {
   if (lmark) lmark.setLatLng([lat, lon]);      /* the GPS button uses this path with the map closed */
   mapPick = { name: lat.toFixed(3) + ", " + lon.toFixed(3), admin1: "", cc: "", lat: lat, lon: lon };
   $("mapuse").disabled = false;
+  var pk = mapPick;                            /* the chain names THIS pick even after the GPS settle
+                                                  moves on; a late name gets adopted (see useMyLocation) */
   var coords = lat.toFixed(3) + ", " + lon.toFixed(3);
   $("mapsel").innerHTML = "Selected <b>" + coords + "</b> · naming it…";
   /* stored on mapPick.naming so the GPS button can await the full chain */
-  mapPick.naming = fetch("https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=12&lat=" + lat + "&lon=" + lon)
+  pk.naming = fetch("https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=12&lat=" + lat + "&lon=" + lon)
     .then(function (r) { return r.json(); })
     .then(function (j) {
-      if (!mapPick || mapPick.lat !== lat || mapPick.lon !== lon) return;
       var a = j.address || {};
       var locality = a.city || a.town || a.village || a.hamlet || a.suburb || "";
       if (locality) {
-        mapPick.name = locality;
-        mapPick.admin1 = a.state || "";
-        mapPick.cc = (a.country_code || "").toUpperCase();
-        $("mapsel").innerHTML = "Selected <b>" + esc(mapPick.name) + "</b> · " + coords;
+        pk.name = locality;
+        pk.admin1 = a.state || "";
+        pk.cc = (a.country_code || "").toUpperCase();
+        if (mapPick === pk) $("mapsel").innerHTML = "Selected <b>" + esc(pk.name) + "</b> · " + coords;
         return;
       }
-      return nameWaterSpot(lat, lon, a, coords);   /* no town here: probably water */
+      return nameWaterSpot(pk, lat, lon, a, coords);   /* no town here: probably water */
     })
-    .catch(function () { $("mapsel").innerHTML = "Selected <b>" + coords + "</b>"; });
+    /* Nominatim down or refused: BigDataCloud can still name land spots */
+    .catch(function () { return nameWaterSpot(pk, lat, lon, {}, coords); });
 }
 /* water clicks: name the body of water, plus the nearest harbor from the NOAA station list */
 var WATER_RE = /ocean|sea\b|bay|channel|strait|sound|gulf|lake|harbou?r|passage|inlet|river/i;
-function nameWaterSpot(lat, lon, a, coords) {
+function nameWaterSpot(pk, lat, lon, a, coords) {
   return fetch("https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=" + lat + "&longitude=" + lon + "&localityLanguage=en")
     .then(function (r) { return r.json(); })
     .then(function (b) {
-      if (!mapPick || mapPick.lat !== lat || mapPick.lon !== lon) return;
       var water = "", i;
       var inf = (b.localityInfo && b.localityInfo.informative) || [];
       for (i = 0; i < inf.length; i++) {           /* keep the last match: most specific water body */
@@ -705,29 +715,28 @@ function nameWaterSpot(lat, lon, a, coords) {
                   (b.locality && !junk.test(b.locality) ? b.locality : "") || a.county || "";
       var state = b.principalSubdivision || a.state || "";
       var done = function () {
-        mapPick.admin1 = state;
-        mapPick.cc = ((b.countryCode || a.country_code || "") + "").toUpperCase();
-        $("mapsel").innerHTML = "Selected <b>" + esc(mapPick.name) + "</b> · " + coords;
+        pk.admin1 = state;
+        pk.cc = ((b.countryCode || a.country_code || "") + "").toUpperCase();
+        if (mapPick === pk) $("mapsel").innerHTML = "Selected <b>" + esc(pk.name) + "</b> · " + coords;
       };
-      if (water && place) { mapPick.name = water + " near " + place; done(); return; }
-      if (!water && place) { mapPick.name = place; done(); return; }
+      if (water && place) { pk.name = water + " near " + place; done(); return; }
+      if (!water && place) { pk.name = place; done(); return; }
       if (water) {
-        mapPick.name = water;
+        pk.name = water;
         return fetch("/data/tide-stations.json").then(function (r2) { return r2.json(); }).then(function (list) {
-          if (!mapPick || mapPick.lat !== lat || mapPick.lon !== lon) return;
           var best = null, bd = 1e18, dy, dx, d2, k;
           for (k = 0; k < list.length; k++) {
             dy = (list[k][2] - lat) * 69; dx = (list[k][3] - lon) * 69 * Math.cos(lat * Math.PI / 180);
             d2 = dy * dy + dx * dx;
             if (d2 < bd) { bd = d2; best = list[k]; }
           }
-          if (best && Math.sqrt(bd) <= 80) mapPick.name = water + " near " + best[1].split(",")[0];
+          if (best && Math.sqrt(bd) <= 80) pk.name = water + " near " + best[1].split(",")[0];
           done();
         }).catch(done);
       }
       done();                                      /* nothing helpful anywhere: the coordinates stand */
     })
-    .catch(function () { $("mapsel").innerHTML = "Selected <b>" + esc(mapPick.name) + "</b> · " + coords; });
+    .catch(function () { if (mapPick === pk) $("mapsel").innerHTML = "Selected <b>" + esc(pk.name) + "</b> · " + coords; });
 }
 function useMapPick() {
   if (!mapPick) return;
@@ -744,8 +753,18 @@ function useMyLocation() {
     var picked = mapPick;
     var settle = function () {
       if (mapPick === picked) mapPick = null;
+      var naming = picked.naming, before = picked.name;
       delete picked.naming;                    /* promises do not belong in localStorage */
       selectLoc(picked);
+      /* naming slower than the 6s cap: picked IS loc (mutated in place), so adopt the
+         late name when it lands - a coordinate headline heals itself */
+      if (naming) naming.then(function () {
+        if (sameLoc(loc, picked) && picked.name !== before) {
+          save("bw_current", loc);
+          save("bw_recents", recents);
+          render();
+        }
+      });
     };
     Promise.race([picked.naming || Promise.resolve(),
                   new Promise(function (ok) { setTimeout(ok, 6000); })]).then(settle, settle);
