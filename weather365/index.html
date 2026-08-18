@@ -494,9 +494,10 @@ function legend(s, sec, items) {
   for (i = 0; i < items.length; i++) total += items[i][1].length * 6.1 + 20 + 14;
   var stack = PHONE && total > W - PADR;      /* narrow phones: one item per line, natural order */
   if (stack) y = sec.y + sec.h + 27;          /* tighter lines so four items clear the next section */
-  /* the stacked block keeps its swatches in one aligned column with ragged text (never
-     right-justified per line); drawn left, then nudged to the right edge by measurement */
-  if (stack) s.push('<g class="lgstack">');
+  /* phones: EVERY legend (one-line included) is wrapped and nudged to the right edge by
+     measurement after render; stacked blocks keep their swatches in one aligned column with
+     ragged text, never right-justified per line */
+  if (PHONE) s.push('<g class="lgstack">');
   for (var n = 0; n < items.length; n++) {
     i = stack ? n : items.length - 1 - n;
     it = items[i]; txtw = it[1].length * 6.1 + 20;
@@ -506,7 +507,7 @@ function legend(s, sec, items) {
     if (stack) y += 12.5;
     else xr -= 14;
   }
-  if (stack) s.push('</g>');
+  if (PHONE) s.push('</g>');
 }
 
 /* ---------- tooltip ---------- */

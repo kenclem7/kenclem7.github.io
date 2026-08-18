@@ -862,7 +862,7 @@ function render() {
     s.push('<path d="' + areaPath(td.h, yD, SEC.tide.y + SEC.tide.h) + '" fill="' + COL.tideFill +
            '" opacity=".8" stroke="' + COL.tideLine + '" stroke-width="1.5"' + CP + '/>');
     td.events.forEach(function (e) {           /* label each high and low with its time */
-      var ex = PADL + (e.i + 0.5) / HOURS * PLOTW, ey = yD(e.v), up = e.type === "H";
+      var ex = x(e.i), ey = yD(e.v), up = e.type === "H";   /* windowed x, so daily mode drops off-day events */
       if (ex < PADL || ex > W - PADR) return;
       s.push('<circle cx="' + ex.toFixed(1) + '" cy="' + ey.toFixed(1) + '" r="2.6" fill="' + COL.tideLine + '"/>');
       s.push('<text x="' + ex.toFixed(1) + '" y="' + (ey + (up ? -7 : 15)).toFixed(1) +
@@ -1010,9 +1010,11 @@ function legend(s, sec, items) {
   var y = sec.y + sec.h + 16, xr = W - PADR, total = 0, i, it, txtw;
   for (i = 0; i < items.length; i++) total += items[i][1].length * 6.1 + 20 + 14;
   var stack = DAILY && total > W - PADR;      /* narrow phones: one item per line, natural order */
-  /* the stacked block keeps its swatches in one aligned column with ragged text (never
-     right-justified per line); drawn left, then nudged to the right edge by measurement */
-  if (stack) s.push('<g class="lgstack">');
+  /* phones: EVERY legend (one-line included) is wrapped and nudged to the right edge by
+     measurement after render - char estimates left long single-item legends far off the edge.
+     Stacked blocks keep their swatches in one aligned column with ragged text, never
+     right-justified per line. */
+  if (DAILY) s.push('<g class="lgstack">');
   for (var n = 0; n < items.length; n++) {
     i = stack ? n : items.length - 1 - n;
     it = items[i]; txtw = it[1].length * 6.1 + 20;
@@ -1023,7 +1025,7 @@ function legend(s, sec, items) {
     if (stack) y += 13;
     else xr -= 14;
   }
-  if (stack) s.push('</g>');
+  if (DAILY) s.push('</g>');
 }
 
 /* ---------- tooltip ---------- */
@@ -1484,7 +1486,9 @@ $("tip").addEventListener("pointerdown", function () { if (mobTip.card) closeCar
 $("hrrrhelp").addEventListener("click", function (ev) {    /* phones: tapping the word HRRR explains it */
   if (!DAILY) return;                          /* desktop keeps the hover tooltip; the label still toggles */
   ev.preventDefault(); ev.stopPropagation();
-  openInfoCard('<div class="t">HRRR</div>' + esc(document.querySelector(".toggle").title));
+  /* phones show one day at a time, so the comparison target reads "daily model" there */
+  openInfoCard('<div class="t">HRRR</div>' +
+               esc(document.querySelector(".toggle").title.replace("10-day model", "daily model")));
 });
 $("hrrrToggle").checked = showHrrr;
 $("hrrrToggle").addEventListener("change", function () {
