@@ -48,9 +48,11 @@
   #pagenav a { color: #1976d2; text-decoration: none; border: 1px solid #c5ccd4; background: #fff; }
   #pagenav a:hover { border-color: #1976d2; background: #f4f9fe; }
   #pagenav .here { color: #fff; background: #1976d2; border: 1px solid #1976d2; cursor: default; }
-  @media (max-width: 600px) {                 /* phones: "3 Day" / "10 Day", equal-width buttons spanning the page */
-    #pagenav .fc { display: none; }
+  #pagenav .daily { display: none; }          /* phones swap the two forecast buttons for one Daily button */
+  @media (max-width: 600px) {                 /* phones: "Daily · Historical", equal-width buttons spanning the page */
     #pagenav { width: 100%; }
+    #pagenav a[href^="/weather3/"], #pagenav a[href^="/weather10/"]:not(.daily) { display: none; }
+    #pagenav .daily { display: block; }
     #pagenav a, #pagenav .here { flex: 1 1 0; text-align: center; padding: 8px 4px; }
   }
   #results { position: absolute; top: 100%; left: 0; right: 0; z-index: 30; background: #fff; border: 1px solid #c5ccd4;
@@ -104,7 +106,7 @@
       <div class="titleblock">
         <h1 id="title">Average Year</h1>
         <div id="locmeta"></div>
-        <div id="pagenav"><a href="/weather3/">3 Day<span class="fc"> Forecast</span></a><a href="/weather10/">10 Day<span class="fc"> Forecast</span></a><span class="here">Historical</span></div>
+        <div id="pagenav"><a class="daily" href="/weather10/">Daily</a><a href="/weather3/">3 Day<span class="fc"> Forecast</span></a><a href="/weather10/">10 Day<span class="fc"> Forecast</span></a><span class="here">Historical</span></div>
       </div>
       <div class="searchwrap">
         <div class="searchrow">
