@@ -181,9 +181,9 @@
 var PADL = 64, PADR = 12, HOURS = 72, DAYSN = HOURS / 24;   /* PADL also holds the drag handles */
 /* chart heights are user-resizable via corner grips; these defaults are also the minimums.
    Width is automatic: charts fill the browser (1080 floor scrolls sideways on small screens). */
-var DEFSIZE = { temp: 150, wind: 140, cloud: 140, vis: 110, accum: 72, tide: 130 };
-var DEFORDER = ["temp", "wind", "cloud", "vis", "accum", "tide"];
-var ROWNAME = { temp: "TEMPERATURE", wind: "WIND", cloud: "CLOUDS", vis: "VISIBILITY", accum: "PRECIP", tide: "TIDE" };
+var DEFSIZE = { temp: 150, wind: 140, cloud: 140, vis: 110, accum: 72, tide: 130, wtemp: 110 };
+var DEFORDER = ["temp", "wind", "cloud", "vis", "accum", "tide", "wtemp"];
+var ROWNAME = { temp: "TEMPERATURE", wind: "WIND", cloud: "CLOUDS", vis: "VISIBILITY", accum: "PRECIP", tide: "TIDE", wtemp: "WATER" };
 var sizes = load("bw_sizes") || {};
 var MINH = DEFSIZE.accum;                    /* any chart may shrink to the precip chart's height; defaults stay as-is */
 Object.keys(DEFSIZE).forEach(function (k) { if (!(sizes[k] >= MINH)) sizes[k] = DEFSIZE[k]; });
@@ -193,7 +193,11 @@ if (!Array.isArray(order) || order.length !== DEFORDER.length ||
     DEFORDER.some(function (k) { return order.indexOf(k) < 0; })) order = DEFORDER.slice();
 /* rows actually drawn: the tide row only exists when a NOAA station is in range */
 function rows() {
-  return order.filter(function (k) { return k !== "tide" || !!(data && data.tide); });
+  return order.filter(function (k) {
+    if (k === "tide") return !!(data && data.tide);
+    if (k === "wtemp") return !!(data && data.hasWtemp);
+    return true;
+  });
 }
 var W, PLOTW, SEC, BOTTOM, SVGH;
 function applyLayout() {
@@ -219,7 +223,8 @@ var COL = {
   accumFill: "#9bd7ea", accumLine: "#3fa7c9", hourlyP: "#1e7d32", hrrr: "#e67e22",
   grid: "#e8eaed", dayline: "#aeb6c0", band: "#f5f7f9", now: "#444",
   visFill: "#dfe6ec", visLine: "#7f8c99", fogBand: "#f7e2c6", fogLine: "#d98a2b",
-  tideFill: "#bfe3f2", tideLine: "#2b8cb8", curLine: "#7b4fa8"
+  tideFill: "#bfe3f2", tideLine: "#2b8cb8", curLine: "#7b4fa8",
+  wtempFill: "#9fd4cb", wtempLine: "#1f7a70", aqi: "#a0522d"
 };
 var DEFAULT_LOC = { name: "Kirkland", admin1: "Washington", cc: "US", lat: 47.68, lon: -122.19, elev: 47 };
 var COMPASS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
@@ -303,6 +308,10 @@ function fmtClock(i) {                       /* fractional hour column -> "10:13
   return v + ":" + (m < 10 ? "0" : "") + m + ap;
 }
 function fmtIn(v) { return (Math.round(v * 100) / 100).toFixed(2); }
+function aqiWord(v) {
+  return v <= 50 ? "good" : v <= 100 ? "moderate" : v <= 150 ? "unhealthy for sensitive groups" :
+         v <= 200 ? "unhealthy" : v <= 300 ? "very unhealthy" : "hazardous";
+}
 
 /* WMO weather code + cloud % -> icon and wording for the day strip */
 function dayIcon(codes, clouds, psum) {
@@ -375,10 +384,16 @@ function loadForecast() {
           current: "temperature_2m,apparent_temperature,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m,is_day" }),
     api({ models: "gfs_hrrr", forecast_days: 3,
           hourly: "temperature_2m,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m" })
-      .catch(function () { return null; })                      /* overlay is optional; page works without it */
+      .catch(function () { return null; }),                     /* overlay is optional; page works without it */
+    fetch("https://marine-api.open-meteo.com/v1/marine?latitude=" + loc.lat + "&longitude=" + loc.lon +
+          "&hourly=sea_surface_temperature&timezone=auto&temperature_unit=fahrenheit&forecast_days=" + DAYSN)
+      .then(function (r) { return r.json(); }).catch(function () { return null; }),
+    fetch("https://air-quality-api.open-meteo.com/v1/air-quality?latitude=" + loc.lat + "&longitude=" + loc.lon +
+          "&hourly=us_aqi,pm2_5&timezone=auto&forecast_days=7")
+      .then(function (r) { return r.json(); }).catch(function () { return null; })
   ]).then(function (res) {
     if (token !== fetchToken) return;
-    build(res[0], res[1], res[2]);
+    build(res[0], res[1], res[2], res[3], res[4]);
     $("status").textContent = "";
     render();
     setLoading(false);
@@ -398,16 +413,19 @@ function loadStations(kind) {
   return fetch("/data/" + kind + "-stations.json").then(function (r) { return r.json(); })
     .then(function (j) { stationLists[kind] = j; return j; });
 }
-function nearestStation(list, latIdx, lonIdx) {
-  var best = null, bd = 1e9, i, dy, dx, d;
+function nearestStations(list, latIdx, lonIdx, n) {
+  var scored = [], i, dy, dx;
   for (i = 0; i < list.length; i++) {
     dy = (list[i][latIdx] - loc.lat) * 69;
     dx = (list[i][lonIdx] - loc.lon) * 69 * Math.cos(loc.lat * Math.PI / 180);
-    d = Math.sqrt(dx * dx + dy * dy);
-    if (d < bd) { bd = d; best = list[i]; }
+    scored.push({ row: list[i], mi: Math.sqrt(dx * dx + dy * dy) });
   }
-  return best ? { row: best, mi: Math.round(bd * 10) / 10 } : null;
+  scored.sort(function (a, b) { return a.mi - b.mi; });
+  scored.length = Math.min(scored.length, n || 1);
+  scored.forEach(function (e) { e.mi = Math.round(e.mi * 10) / 10; });
+  return scored;
 }
+function nearestStation(list, latIdx, lonIdx) { return nearestStations(list, latIdx, lonIdx, 1)[0] || null; }
 var NOAA = "https://api.tidesandcurrents.noaa.gov/api/prod/datagetter?units=english&time_zone=lst_ldt&format=json";
 function ymd(t) { return t.slice(0, 10).replace(/-/g, ""); }
 function hourIndexMap() {                     /* "2026-08-18 14" -> hour column */
@@ -419,26 +437,44 @@ function loadTides() {
   var tok = fetchToken, t = data.times, idx = hourIndexMap();
   var span = "&begin_date=" + ymd(t[0]) + "&end_date=" + ymd(t[t.length - 1]);
   loadStations("tide").then(function (list) {
-    var n = nearestStation(list, 2, 3);
-    if (!n || n.mi > 60) return null;         /* nothing close enough to mean anything */
-    var u = NOAA + "&product=predictions&datum=MLLW&station=" + n.row[0] + span;
-    return Promise.all([
-      fetch(u + "&interval=h").then(function (r) { return r.json(); }),
-      fetch(u + "&interval=hilo").then(function (r) { return r.json(); })
-    ]).then(function (res) {
-      if (tok !== fetchToken) return null;
-      var h = new Array(HOURS).fill(null), ev = [], k, ix;
-      (res[0].predictions || []).forEach(function (p) {
-        ix = idx[p.t.slice(0, 13)];
-        if (ix !== undefined) h[ix] = +p.v;
+    /* some listed stations serve no MLLW predictions (e.g. Admiralty Head), so walk the nearest few */
+    var cands = nearestStations(list, 2, 3, 3).filter(function (c) { return c.mi <= 60; });
+    function attempt(ci) {
+      if (ci >= cands.length) return null;
+      var n = cands[ci];
+      var u = NOAA + "&product=predictions&datum=MLLW&station=" + n.row[0] + span;
+      return Promise.all([
+        fetch(u + "&interval=h").then(function (r) { return r.json(); }),
+        fetch(u + "&interval=hilo").then(function (r) { return r.json(); })
+      ]).then(function (res) {
+        if (tok !== fetchToken) return null;
+        var h = new Array(HOURS).fill(null), ev = [], ix;
+        (res[0].predictions || []).forEach(function (p) {
+          ix = idx[p.t.slice(0, 13)];
+          if (ix !== undefined) h[ix] = +p.v;
+        });
+        (res[1].predictions || []).forEach(function (p) {
+          ix = idx[p.t.slice(0, 13)];
+          if (ix !== undefined) ev.push({ i: ix + (+p.t.slice(14, 16)) / 60, v: +p.v, type: p.type });
+        });
+        if (!h.some(function (v) { return v !== null; })) {
+          /* subordinate stations serve only high/low: synthesize the hourly curve between extremes */
+          if (ev.length >= 2) {
+            var e1, e2, xh2, f2;
+            for (var k2 = 0; k2 + 1 < ev.length; k2++) {
+              e1 = ev[k2]; e2 = ev[k2 + 1];
+              for (xh2 = Math.max(0, Math.ceil(e1.i)); xh2 <= Math.floor(e2.i) && xh2 < HOURS; xh2++) {
+                f2 = (xh2 - e1.i) / (e2.i - e1.i);
+                h[xh2] = e1.v + (e2.v - e1.v) * (1 - Math.cos(Math.PI * f2)) / 2;
+              }
+            }
+          }
+          if (!h.some(function (v) { return v !== null; })) return attempt(ci + 1);
+        }
+        return { station: n.row[1], mi: n.mi, h: h, events: ev, cur: null };
       });
-      (res[1].predictions || []).forEach(function (p) {
-        ix = idx[p.t.slice(0, 13)];
-        if (ix !== undefined) ev.push({ i: ix + (+p.t.slice(14, 16)) / 60, v: +p.v, type: p.type });
-      });
-      if (!h.some(function (v) { return v !== null; })) return null;
-      return { station: n.row[1], mi: n.mi, h: h, events: ev, cur: null };
-    });
+    }
+    return attempt(0);
   }).then(function (tide) {
     if (!tide || tok !== fetchToken) return;
     data.tide = tide;
@@ -479,7 +515,7 @@ function loadCurrents(tok, idx, span) {
   }).catch(function () {});
 }
 
-function build(ec, pr, hr) {
+function build(ec, pr, hr, mar, aq) {
   var h = ec.hourly, times = h.time;
   var byTime = {};
   for (var i = 0; i < times.length; i++) byTime[times[i]] = i;
@@ -506,6 +542,22 @@ function build(ec, pr, hr) {
     hrrr.wgst[qi] = hr.hourly.wind_gusts_10m[q];
     hrrr.wdir[qi] = hr.hourly.wind_direction_10m[q];
     hrrr.any = true;
+  }
+
+  /* sea surface temperature (marine model: real values only on salt water) */
+  var wtemp = new Array(times.length).fill(null), hasW = false;
+  if (mar && mar.hourly) for (var w = 0; w < mar.hourly.time.length; w++) {
+    var wi = byTime[mar.hourly.time[w]];
+    var wv = mar.hourly.sea_surface_temperature[w];
+    if (wi !== undefined && wv !== null && wv !== undefined) { wtemp[wi] = wv; hasW = true; }
+  }
+  /* air quality (7-day horizon, nulls beyond) */
+  var aqi = new Array(times.length).fill(null), pm25 = new Array(times.length).fill(null);
+  if (aq && aq.hourly) for (var q2 = 0; q2 < aq.hourly.time.length; q2++) {
+    var ai = byTime[aq.hourly.time[q2]];
+    if (ai === undefined) continue;
+    aqi[ai] = aq.hourly.us_aqi[q2];
+    pm25[ai] = aq.hourly.pm2_5[q2];
   }
 
   /* cumulative precip */
@@ -554,7 +606,7 @@ function build(ec, pr, hr) {
   data = { times: times, temp: h.temperature_2m, feels: h.apparent_temperature, precip: h.precipitation,
            cloud: h.cloud_cover, wspd: h.wind_speed_10m, wgst: h.wind_gusts_10m, wdir: h.wind_direction_10m,
            prob: prob, vis: vis, accum: accum, hrrr: hrrr, days: days, now: (pr && pr.current) || null,
-           tide: null,
+           tide: null, wtemp: wtemp, hasWtemp: hasW, aqi: aqi, pm25: pm25,
            nowIdx: (nowIdx === undefined ? null : nowIdx),
            nowFrac: (nowIdx === undefined ? null : nowIdx + locNow.getUTCMinutes() / 60), fetched: new Date() };
 }
@@ -701,7 +753,12 @@ function render() {
     /* a line, not a filled area: visibility sits pinned at the top most of the time */
     s.push('<path d="' + linePath(data.vis.map(function (v) { return v === null ? null : Math.min(v, VMAX); }), yV) +
            '" fill="none" stroke="' + COL.visLine + '" stroke-width="2"/>');
-    legend(s, SEC.vis, [[COL.visLine, "Visibility (miles, 10 = clear)"], [COL.fogBand, "Fog (under 1 mi)"]]);
+    if (data.aqi && data.aqi.some(function (v) { return v !== null; })) {   /* smoke and air quality overlay */
+      var yQ = function (v) { return SEC.vis.y + SEC.vis.h * (1 - Math.min(v, 200) / 200); };
+      s.push('<path d="' + linePath(data.aqi, yQ) + '" fill="none" stroke="' + COL.aqi + '" stroke-width="1.6" stroke-dasharray="5 3"/>');
+    }
+    legend(s, SEC.vis, [[COL.visLine, "Visibility (miles, 10 = clear)"], [COL.fogBand, "Fog (under 1 mi)"],
+                        [COL.aqi, "Air Quality (US AQI, 0-200 scale)", true]]);
   } else {
     s.push('<text x="' + (PADL + PLOTW / 2) + '" y="' + (SEC.vis.y + SEC.vis.h / 2) +
            '" text-anchor="middle" font-size="13" fill="#9aa3ac">No visibility data for this location</text>');
@@ -743,6 +800,18 @@ function render() {
       tideLegend.push(["#c9ced4", td.cur.station + ": " + td.cur.note.toLowerCase()]);
     }
     legend(s, SEC.tide, tideLegend);
+  }
+
+  /* ---- water temperature ---- */
+  if (SEC.wtemp) {
+    var wvals = data.wtemp.filter(function (v) { return v !== null; });
+    var wLo = Math.floor(Math.min.apply(null, wvals)) - 2, wHi = Math.ceil(Math.max.apply(null, wvals)) + 2;
+    if (wHi - wLo < 4) wHi = wLo + 4;
+    var yWT = function (v) { return SEC.wtemp.y + SEC.wtemp.h * (1 - (v - wLo) / (wHi - wLo)); };
+    grid(s, SEC.wtemp, wLo, wHi, Math.max(1, Math.round((wHi - wLo) / 4)), function (v) { return v + " F"; });
+    s.push('<path d="' + areaPath(data.wtemp, yWT, SEC.wtemp.y + SEC.wtemp.h) + '" fill="' + COL.wtempFill + '" opacity=".45" stroke="none"/>');
+    s.push('<path d="' + linePath(data.wtemp, yWT) + '" fill="none" stroke="' + COL.wtempLine + '" stroke-width="1.8"/>');
+    legend(s, SEC.wtemp, [[COL.wtempLine, "Water Temperature (°F)"]]);
   }
 
   /* "now" marker */
@@ -859,7 +928,10 @@ function bindPointer() {
       (data.tide && data.tide.h[i] !== null ? "<br>🌊 tide " + data.tide.h[i].toFixed(1) + " ft" +
         (data.tide.cur && data.tide.cur.v && data.tide.cur.v[i] !== null && data.tide.cur.v[i] !== undefined ?
           " · current " + Math.abs(data.tide.cur.v[i]).toFixed(1) + " kn " +
-          (data.tide.cur.v[i] >= 0 ? "flood" : "ebb") : "") : "");
+          (data.tide.cur.v[i] >= 0 ? "flood" : "ebb") : "") : "") +
+      (data.wtemp && data.wtemp[i] !== null ? "<br>≋ water " + Math.round(data.wtemp[i]) + "°F" : "") +
+      (data.aqi && data.aqi[i] !== null ? "<br>🔥 AQI " + Math.round(data.aqi[i]) + " (" + aqiWord(data.aqi[i]) + ")" +
+        (data.pm25 && data.pm25[i] !== null ? " · PM2.5 " + Math.round(data.pm25[i]) : "") : "");
     if (showHrrr && data.hrrr.wspd[i] !== null) {
       html += '<br><span class="hrrr">HRRR: ' + Math.round(data.hrrr.wspd[i]) + " mph from " +
               compass(data.hrrr.wdir[i]) + " · " + Math.round(data.hrrr.temp[i]) + "° · cloud " +

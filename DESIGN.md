@@ -37,6 +37,8 @@ The whole site is robots-blocked (`robots.txt` Disallow all + `noindex` meta on 
 | Open-Meteo forecast API, `models=gfs_hrrr` | HRRR short-range overlay, first ~2 days (orange dashes, toggleable) | same |
 | Open-Meteo archive API (ERA5) | weather365: one fetch of 10 years of daily history per city | same |
 | Open-Meteo geocoding API | Location search box | same |
+| Open-Meteo marine API | WATER row: 10-day sea surface temperature (real values only on salt water; row auto-hides elsewhere) | same |
+| Open-Meteo air-quality API | US AQI + PM2.5 overlay on the visibility row (7-day horizon) | same |
 | NOAA CO-OPS (tidesandcurrents.noaa.gov) | Tide predictions (hourly + high/low events) and current predictions | US government work, public domain, CORS-enabled. No key. |
 | OpenStreetMap tiles + Leaflet 1.9.4 (unpkg CDN) + Nominatim reverse geocoding | "Use Map" location picker | Free, no key, no account. OSM attribution shown on the map. Leaflet lazy-loads on first open. |
 | BigDataCloud reverse-geocode-client | Naming water clicks on the map (body of water + state when available) | Free client API, no key, CORS-enabled. Only called when Nominatim finds no locality. |
@@ -73,16 +75,16 @@ Recents are a pull-down under the search row (#recwrap, exactly the width of inp
 
 **Day strip:** date (18px/600 with a little padding above and below), hi/lo (14px), icon emoji, condition, precip, sunrise/sunset row ("↑6:05am  ↓8:21pm", non-breaking spaces, amber #c08a12). Strip height 146 (space below the date visually equals the space above). Dates are one 18px line: spelled out ("Sunday, August 16") where the column fits it (~9.7px/char fit test - the 3 Day page), compact "Sun 8/16" where it does not (the 10 Day page, per Ken). A two-line weekday-over-date variant was tried and reverted 2026-08-23.
 
-**Chart rows, default order:** TEMPERATURE, WIND, CLOUDS, VISIBILITY, PRECIP, TIDE.
+**Chart rows, default order:** TEMPERATURE, WIND, CLOUDS, VISIBILITY, PRECIP, TIDE, WATER.
 
 | Row | Contents |
 |-----|----------|
 | Temperature | temp (red) + feels-like (purple), HRRR dashes |
 | Wind | speed line light blue #93c4ec with navy #14396e direction arrows every 3h **pointing where the wind is going** (tooltip says "from"); gusts dashed gray. **Axis tops out at the exact max drawn gust** (Ken's explicit rule, do not "nice-round" it) with whole-number gridlines below. |
 | Clouds | cloud cover gray area + precip chance blue area (ensemble), HRRR dashes |
-| Visibility | line (not area - it pins at 10+ mi most days), 0-10 mi axis, orange dashed line at 1 mi over a tan "fog" band. From best-match model. |
+| Visibility | line (not area - it pins at 10+ mi most days), 0-10 mi axis, orange dashed line at 1 mi over a tan "fog" band (best-match model). OVERLAID with wildfire smoke / air quality: brown dashed US AQI line on its own 0-200 scale (air-quality API, 7-day horizon, values over 200 pinned); tooltip gives the number, the category word, and PM2.5. |
 | Precip | accumulation area + hourly precip line |
-| Tide | NOAA hourly tide curve (ft MLLW), every high/low labeled with height + time; **current overlaid** in purple on its own ± scale around a dotted zero (+flood / -ebb, knots), built by cosine-interpolating NOAA's MAX_SLACK events. Legend names both stations and their distances. Row only exists when a tide station is within 60 mi (currents within 25 mi). Many stations return the literal string "Currents are weak and variable" - shown in the legend as NOAA's answer. |
+| Tide | NOAA hourly tide curve (ft MLLW), every high/low labeled with height + time; **current overlaid** in purple on its own ± scale around a dotted zero (+flood / -ebb, knots), built by cosine-interpolating NOAA's MAX_SLACK events. Legend names both stations and their distances. Row only exists when a tide station is within 60 mi (currents within 25 mi). Station fallback: the nearest 3 stations are tried in order because some listed stations (e.g. Admiralty Head) serve no hourly MLLW predictions; if a station only serves high/low (subordinate stations), the hourly curve is SYNTHESIZED by cosine interpolation between the hilo extremes. Many stations return the literal string "Currents are weak and variable" - shown in the legend as NOAA's answer. |
 
 Station lookup uses `data/tide-stations.json` and `data/current-stations.json`: pre-trimmed copies of NOAA's station metadata (340KB total vs NOAA's 5.6MB). Regenerate occasionally from `api.tidesandcurrents.noaa.gov/mdapi/prod/webapi/stations.json?type=tidepredictions|currentpredictions` keeping `[id,name,lat,lng]` / `[id,bin,name,lat,lng]`.
 
@@ -126,3 +128,4 @@ Share-link visits never write `bw_current`, so opening someone's link does not c
 ## 9. House copy rules
 
 - "N Day Forecast" (no hyphen, capital D), "homepage" not "landing page", lowercase tight am/pm on sun times ("6:05am"), no em dashes in copy.
+| Water | teal sea-surface-temperature line + soft fill, whole-degree axis. Marine-model data; the row appears only where the model has values (salt water). |
