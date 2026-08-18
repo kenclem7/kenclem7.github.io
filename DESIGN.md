@@ -25,7 +25,7 @@ The whole site is robots-blocked (`robots.txt` Disallow all + `noindex` meta on 
 - GitHub Pages, repo `kenclem7/kenclem7.github.io` (public, required for free Pages), branch `main`, legacy build from root. `.nojekyll` present.
 - **Deploy = push to main.** Pages rebuilds in under a minute. No build step, no bundler; every page is one self-contained HTML file with inline CSS and JS.
 - Custom domain via `CNAME` file; https enforced. DNS lives at Hover: four GitHub Pages A records on the apex (185.199.108-111.153) plus `www` CNAME to `kenclem7.github.io`. Hover also keeps its default MX records (email plumbing, unrelated to the site).
-- Local dev: `py -m http.server 3462 --directory kenclements-site` (launch.json entry `kenclements-site`), pages at `localhost:3462/weather10/` etc.
+- Local dev: `py -m http.server 3462 --directory weatherchart` (launch.json entry `weatherchart`), pages at `localhost:3462/weather10/` etc. (Local folder renamed from `kenclements-site` to `weatherchart` 2026-08-17; repo name unchanged.)
 - Layout note learned the hard way: chart width leaves 2px slack under the container, otherwise Windows fractional display scaling (125%) creates a sub-pixel overflow and a useless scrollbar.
 
 ## 3. Data sources (all free)
