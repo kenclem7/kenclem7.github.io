@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "weatherchart-worktree",
+      "runtimeExecutable": "py",
+      "runtimeArgs": ["-m", "http.server", "3463", "--directory", "."],
+      "port": 3463
+    }
+  ]
+}
