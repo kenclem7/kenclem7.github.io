@@ -136,3 +136,4 @@ Share-link visits never write `bw_current`, so opening someone's link does not c
 ## 9. House copy rules
 
 - "N Day Forecast" (no hyphen, capital D), "homepage" not "landing page", lowercase tight am/pm on sun times and the header's "updated" stamp ("6:05am", "updated 7:18am"), no em dashes in copy.
+- The h1 never line-breaks between the number and "Day" (runtime nbsp, 2026-08-18, generator-safe): a long city name wraps BEFORE the number instead ("...Washington / 3 Day Weather Forecast").

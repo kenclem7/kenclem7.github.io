@@ -994,7 +994,8 @@ function render() {
     $("dayprev").disabled = viewDay <= 0;
     $("daynext").disabled = viewDay >= DAYSN - 1;
   } else closeCard();                          /* leaving daily mode dismisses the reading card */
-  $("title").textContent = locLabel(loc) + (DAILY ? " Daily Weather Forecast" : " 10 Day Weather Forecast");
+  /* nbsp ties the digits to "Day": a long city wraps BEFORE the number, never after the digits */
+  $("title").textContent = locLabel(loc) + (DAILY ? " Daily Weather Forecast" : " 10 Day Weather Forecast".replace(" Day", "\u00A0Day"));
   document.title = locLabel(loc, true) + " · Weather Chart";
   renderNow();
   var latN = Math.abs(loc.lat).toFixed(2) + "°" + (loc.lat >= 0 ? "N" : "S");
