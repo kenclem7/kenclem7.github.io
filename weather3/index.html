@@ -26,6 +26,9 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Weather Chart</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⛵</text></svg>">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">  <!-- Safari renders no SVG favicons and the home-screen tile needs a real PNG; /favicon.ico ships too -->
+<meta name="theme-color" content="#eef1f4">
+<link rel="preconnect" href="https://api.open-meteo.com" crossorigin>  <!-- the first fetch this page awaits: warm the TLS setup while the HTML parses -->
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif; background: #eef1f4; color: #222; }
@@ -53,6 +56,7 @@
   .searchwrap { grid-column: 3; justify-self: end; position: relative; width: 345px; max-width: 100%; }
   .searchrow { display: flex; gap: 8px; }
   #q { flex: 1; min-width: 0; padding: 8px 10px; font-size: 14px; border: 1px solid #c5ccd4; border-radius: 6px; outline: none; }
+  @media (max-width: 600px) { #q { font-size: 16px; } }  /* under 16px iOS Safari zooms the page on focus and leaves it zoomed */
   #q:focus { border-color: #1976d2; }
   .mapbtn { align-self: flex-start; padding: 8px 12px; font-size: 14px; border: 1px solid #c5ccd4; border-radius: 6px;
             background: #fff; cursor: pointer; white-space: nowrap; }
@@ -111,8 +115,8 @@
   #recmenu .row:hover { background: #eaf3fc; }
   #recmenu .row.active { color: #0d5ba1; font-weight: 600; background: #f2f8fd; }
   #recmenu .row b { font-weight: inherit; flex: 1; }
-  #recmenu .row .sub { color: #98a2ad; font-size: 12px; }
-  #recmenu .row .rm { color: #98a2ad; font-size: 14px; line-height: 1; padding: 1px 4px; border-radius: 8px; }
+  #recmenu .row .sub { color: #6b7683; font-size: 12px; }
+  #recmenu .row .rm { color: #6b7683; font-size: 14px; line-height: 1; padding: 1px 4px; border-radius: 8px; }
   #recmenu .row .rm:hover { background: #d9dee4; color: #555; }
   /* narrow screens: stack the header (must sit AFTER the base header rules to win the cascade) */
   @media (max-width: 900px) {
@@ -145,6 +149,7 @@
   .spin { width: 52px; height: 52px; border: 5px solid #cfe0f0; border-top-color: #1976d2; border-radius: 50%;
           animation: bwspin .9s linear infinite; }
   @keyframes bwspin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2.5s; } }
   svg text { font-family: inherit; }
   #tip { position: absolute; display: none; z-index: 20; background: rgba(255,255,255,.97); border: 1px solid #b9c2cb;
          border-radius: 8px; box-shadow: 0 3px 10px rgba(0,0,0,.15); padding: 11px 15px; font-size: 19px; line-height: 1.5;
@@ -183,7 +188,7 @@
   #chart .drag:hover text { fill: #1976d2; }
   #chart .drag.on { cursor: grabbing; }
   #chart .drag.on circle, #chart .drag.on text { fill: #1976d2; }
-  .foot { font-size: 11.5px; color: #98a2ad; padding: 10px 2px 6px; }
+  .foot { font-size: 11.5px; color: #6b7683; padding: 10px 2px 6px; }
   .foot a { color: #1976d2; text-decoration: none; }
   .foot a:hover { text-decoration: underline; }
 </style>
@@ -322,17 +327,23 @@ var MONF = ["January","February","March","April","May","June","July","August","S
 var loc = load("bw_current") || load("bw2_current") || DEFAULT_LOC;
 (function () {                               /* a shared link opens on its own location */
   var q = new URLSearchParams(location.search);
-  if (q.get("lat") && q.get("lon")) {
+  var qla = +q.get("lat"), qlo = +q.get("lon");   /* a garbage or truncated link falls back to the saved city */
+  if (q.get("lat") && q.get("lon") && isFinite(qla) && Math.abs(qla) <= 90 && isFinite(qlo) && Math.abs(qlo) <= 180) {
     loc = { name: q.get("name") || "Shared spot", admin1: q.get("admin1") || "", cc: q.get("cc") || "",
-            lat: +q.get("lat"), lon: +q.get("lon") };
-    if (q.get("elev")) loc.elev = +q.get("elev");
+            lat: qla, lon: qlo };
+    if (q.get("elev") && isFinite(+q.get("elev"))) loc.elev = +q.get("elev");
   }
 })();
 var recents = load("bw_recents") || [DEFAULT_LOC];
+/* bw_current/bw_recents are shared across three pages: a corrupt-but-valid-JSON value
+   (non-array, null entry, string coords) would throw in renderRecents before the first fetch */
+if (!Array.isArray(recents) || recents.some(function (r) { return !r || typeof r.lat !== "number" || !isFinite(r.lat) || typeof r.lon !== "number" || !isFinite(r.lon); })) recents = [DEFAULT_LOC];
+if (!loc || typeof loc.lat !== "number" || !isFinite(loc.lat) || typeof loc.lon !== "number" || !isFinite(loc.lon)) loc = DEFAULT_LOC;
 var showHrrr = load("bw_hrrr");
 if (showHrrr === null) showHrrr = true;
 var data = null;          /* built forecast bundle for the tooltip + redraws */
 var fetchToken = 0;
+var lastLoad = 0;         /* when loadForecast last started; the visibility handler measures staleness from it */
 
 function load(k) { try { var v = localStorage.getItem(k); return v === null ? null : JSON.parse(v); } catch (e) { return null; } }
 function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
@@ -494,6 +505,9 @@ function api(params) {
 
 function loadForecast() {
   var token = ++fetchToken;
+  lastLoad = Date.now();
+  loadStations("tide"); loadStations("current");   /* kick the big station files off beside the forecast
+                                                      instead of after it (they used to wait a full round-trip) */
   $("status").textContent = "Loading forecast for " + locLabel(loc) + "…";
   setLoading(true);
   Promise.all([
@@ -526,11 +540,19 @@ function loadForecast() {
 }
 
 /* ---------- tides + currents (NOAA CO-OPS, public domain) ---------- */
-var stationLists = {};
+var STATIONS_V = 1;       /* bump when data/*-stations.json regenerate (tools/refresh-stations.py) */
+var stationLists = {};    /* kind -> Promise of rows; memoizing the promise stops overlapping double-fetches */
 function loadStations(kind) {
-  if (stationLists[kind]) return Promise.resolve(stationLists[kind]);
-  return fetch("/data/" + kind + "-stations.json").then(function (r) { return r.json(); })
-    .then(function (j) { stationLists[kind] = j; return j; });
+  if (stationLists[kind]) return stationLists[kind];
+  stationLists[kind] = Promise.resolve().then(function () {
+    /* the two station files are ~117KB gz - 75% of a cold load - and GitHub Pages stamps deploy time
+       into every ETag, so they re-downloaded after every push; localStorage holds them behind a version pin */
+    var c = load("bw_stations_" + kind);
+    if (c && c.v === STATIONS_V && Array.isArray(c.rows)) return c.rows;
+    return fetch("/data/" + kind + "-stations.json").then(function (r) { return r.json(); })
+      .then(function (rows) { save("bw_stations_" + kind, { v: STATIONS_V, rows: rows }); return rows; });
+  });
+  return stationLists[kind];
 }
 function nearestStations(list, latIdx, lonIdx, n) {
   var scored = [], i, dy, dx;
@@ -565,7 +587,9 @@ function loadTides() {
       return Promise.all([
         fetch(u + "&interval=h").then(function (r) { return r.json(); }),
         fetch(u + "&interval=hilo").then(function (r) { return r.json(); })
-      ]).then(function (res) {
+      ]).catch(function () { return null; }).then(function (res) {
+        if (res === null) return attempt(ci + 1);  /* hard failure (network, non-JSON 5xx): next station,
+                                                      not a dead tide row (graceful "no data" already walks) */
         if (tok !== fetchToken) return null;
         var h = new Array(HOURS).fill(null), ev = [], ix;
         (res[0].predictions || []).forEach(function (p) {
@@ -1281,10 +1305,15 @@ function buildSticky() {
   var src = $("wx"), host = $("stickyinner");
   if (!src || !host) return;
   host.innerHTML = "";
+  if (DAILY) return;                          /* daily mode never shows the sticky date row: skip the clone */
   var c = src.cloneNode(true);
   c.removeAttribute("id");                    /* no duplicate ids in the document */
   var xh2 = c.querySelector("#xh");
   if (xh2) xh2.removeAttribute("id");
+  var cp = c.querySelector("clipPath");       /* the clone precedes the live chart in the DOM, so a kept
+                                                 #pclip would capture url(#pclip) and freeze the live clip
+                                                 at its build-time height mid-resize */
+  if (cp) cp.removeAttribute("id");
   c.style.pointerEvents = "none";
   host.appendChild(c);
   updateSticky();
@@ -1342,7 +1371,7 @@ if (mqPhone && mqPhone.addEventListener) mqPhone.addEventListener("change", func
   if (!resizeRaf) resizeRaf = requestAnimationFrame(function () { resizeRaf = 0; render(); });
 });
 window.addEventListener("pointerup", function () {
-  if (resizing) { resizing = null; save("bw_sizes", sizes); }
+  if (resizing) { resizing = null; save("bw_sizes", sizes); render(); }   /* rebuild the sticky clone at the final height */
   if (dragging) { dragging = null; save("bw_order", order); render(); }
 });
 
@@ -1446,7 +1475,7 @@ function nameWaterSpot(pk, lat, lon, a, coords) {
       if (!water && place) { pk.name = place; done(); return; }
       if (water) {
         pk.name = water;
-        return fetch("/data/tide-stations.json").then(function (r2) { return r2.json(); }).then(function (list) {
+        return loadStations("tide").then(function (list) {
           var best = null, bd = 1e18, dy, dx, d2, k;
           for (k = 0; k < list.length; k++) {
             dy = (list[k][2] - lat) * 69; dx = (list[k][3] - lon) * 69 * Math.cos(lat * Math.PI / 180);
@@ -1476,18 +1505,8 @@ function useMyLocation() {
     var picked = mapPick;
     var settle = function () {
       if (mapPick === picked) mapPick = null;
-      var naming = picked.naming, before = picked.name;
-      delete picked.naming;                    /* promises do not belong in localStorage */
-      setLocation(picked);
-      /* naming slower than the 6s cap: picked IS loc (mutated in place), so adopt the
-         late name when it lands - a coordinate headline heals itself */
-      if (naming) naming.then(function () {
-        if (sameLoc(loc, picked) && picked.name !== before) {
-          save("bw_current", loc);
-          save("bw_recents", recents);
-          render();
-        }
-      });
+      setLocation(picked);                     /* setLocation strips the naming promise and adopts the
+                                                  late name for every pick path - map, GPS, search */
     };
     Promise.race([picked.naming || Promise.resolve(),
                   new Promise(function (ok) { setTimeout(ok, 6000); })]).then(settle, settle);
@@ -1530,6 +1549,9 @@ document.addEventListener("keydown", function (ev) {
 });
 
 function setLocation(l) {
+  var naming = l.naming, before = l.name;      /* map + GPS picks carry a naming chain; promises do not
+                                                  belong in localStorage, so strip it before any save */
+  delete l.naming;
   loc = l; save("bw_current", loc);
   viewDay = 0;                                 /* a new city opens on today (auto-refresh keeps the day) */
   closeCard(); mobTip.i = null;
@@ -1540,6 +1562,15 @@ function setLocation(l) {
   save("bw_recents", recents);
   renderRecents();
   loadForecast();
+  if (naming) naming.then(function () {        /* naming still running: l IS loc (and the recents head),
+                                                  so adopt the late name in place and re-save */
+    if (sameLoc(loc, l) && l.name !== before) {
+      save("bw_current", loc);
+      save("bw_recents", recents);
+      render();
+      renderRecents();
+    }
+  });
 }
 
 var searchTimer = null, searchSeq = 0;
@@ -1607,7 +1638,13 @@ renderTitle();                                 /* the right title before any dat
 wireSearch();
 renderRecents();
 loadForecast();
-setInterval(loadForecast, 30 * 60 * 1000);
+setInterval(function () {                      /* half-hourly refresh, but not for tabs nobody is looking at */
+  if (!document.hidden) loadForecast();
+}, 30 * 60 * 1000);
+document.addEventListener("visibilitychange", function () {
+  /* a tab surfacing after hours in the background catches up now instead of waiting out the interval */
+  if (!document.hidden && Date.now() - lastLoad > 30 * 60 * 1000) loadForecast();
+});
 window.__bw = { get data() { return data; }, get loc() { return loc; }, get recents() { return recents; } };
 </script>
 </body>
