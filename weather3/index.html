@@ -705,9 +705,18 @@ function renderNow() {
   box.style.display = "flex";
 }
 
+/* phones: the search box, map/GPS buttons and recents pull-down sit ABOVE the Daily/Historical
+   buttons - the nav is reparented out of the title block to after the search column (and back) */
+function placeNav() {
+  var nav = $("pagenav"), hd = document.querySelector("header"), tb = document.querySelector(".titleblock");
+  if (mqPhone && mqPhone.matches) { if (nav.parentNode !== hd) hd.insertBefore(nav, hd.querySelector(".toggle")); }
+  else if (nav.parentNode !== tb) tb.appendChild(nav);
+}
+
 /* ---------- render ---------- */
 function render() {
   if (!data) return;
+  placeNav();
   applyLayout();
   $("chartbox").style.width = W + "px";
   var s = [], i, d;
@@ -944,6 +953,16 @@ function render() {
   s.push("</svg>");
   $("chart").innerHTML = s.join("");
 
+  /* stacked legends (phones) hug the right edge of the plot per Ken 2026-08-18: the block is
+     drawn left-aligned (swatch column + ragged text), then shifted right by measured width */
+  Array.prototype.forEach.call(document.querySelectorAll("#chart .lgstack"), function (g) {
+    var right = 0;
+    Array.prototype.forEach.call(g.querySelectorAll("text"), function (t) {
+      right = Math.max(right, +t.getAttribute("x") + t.getComputedTextLength());
+    });
+    if (right) g.setAttribute("transform", "translate(" + Math.max(0, W - PADR - right).toFixed(1) + ",0)");
+  });
+
   bindPointer();
   if (!dragging && !resizing) buildSticky();  /* skip while dragging: cloning every frame would jank */
   /* day pager (daily mode only): sticky ◀ date ▶ bar above the chart */
@@ -985,7 +1004,10 @@ function grid(s, sec, lo, hi, step, fmt) {
 function legend(s, sec, items) {
   var y = sec.y + sec.h + 16, xr = W - PADR, total = 0, i, it, txtw;
   for (i = 0; i < items.length; i++) total += items[i][1].length * 6.1 + 20 + 14;
-  var stack = DAILY && total > W - PADR;      /* narrow phones: one item per line, left-aligned, natural order */
+  var stack = DAILY && total > W - PADR;      /* narrow phones: one item per line, natural order */
+  /* the stacked block keeps its swatches in one aligned column with ragged text (never
+     right-justified per line); drawn left, then nudged to the right edge by measurement */
+  if (stack) s.push('<g class="lgstack">');
   for (var n = 0; n < items.length; n++) {
     i = stack ? n : items.length - 1 - n;
     it = items[i]; txtw = it[1].length * 6.1 + 20;
@@ -996,6 +1018,7 @@ function legend(s, sec, items) {
     if (stack) y += 13;
     else xr -= 14;
   }
+  if (stack) s.push('</g>');
 }
 
 /* ---------- tooltip ---------- */
@@ -1216,6 +1239,7 @@ window.addEventListener("resize", function () {  /* browser resized: refit chart
   if (!resizeRaf) resizeRaf = requestAnimationFrame(function () { resizeRaf = 0; render(); });
 });
 if (mqPhone && mqPhone.addEventListener) mqPhone.addEventListener("change", function () {
+  placeNav();                                  /* keeps the nav placed even before data arrives */
   if (!resizeRaf) resizeRaf = requestAnimationFrame(function () { resizeRaf = 0; render(); });
 });
 window.addEventListener("pointerup", function () {
@@ -1455,6 +1479,7 @@ $("hrrrToggle").checked = showHrrr;
 $("hrrrToggle").addEventListener("change", function () {
   showHrrr = this.checked; save("bw_hrrr", showHrrr); render();
 });
+placeNav();
 wireSearch();
 renderRecents();
 loadForecast();
