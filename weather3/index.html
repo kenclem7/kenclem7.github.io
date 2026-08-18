@@ -73,18 +73,19 @@
     #pagenav .daily { display: block; }
     #pagenav a, #pagenav .here { flex: 1 1 0; text-align: center; padding: 8px 4px; }
   }
-  #results { position: absolute; top: 100%; left: 0; right: 0; z-index: 30; background: #fff; border: 1px solid #c5ccd4;
+  #results { position: absolute; top: 100%; left: 0; right: 0; z-index: 51; background: #fff; border: 1px solid #c5ccd4;
              border-radius: 0 0 6px 6px; box-shadow: 0 6px 16px rgba(0,0,0,.12); max-height: 240px; overflow-y: auto; }
   #results div { padding: 8px 10px; font-size: 13px; cursor: pointer; }
   #results div:hover, #results div.sel { background: #eaf3fc; }
   #results .none { color: #999; cursor: default; }
 
-  #recwrap { position: relative; margin-top: 8px; }
+  #recrow { display: flex; gap: 8px; margin-top: 8px; }
+  #recwrap { position: relative; flex: 1; min-width: 0; }
   #recbtn { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px;
             font-size: 14px; border: 1px solid #c5ccd4; border-radius: 6px; background: #fff; cursor: pointer; }
   #recbtn:hover { border-color: #1976d2; }
   #recbtn .caret { color: #8a939c; font-size: 12px; }
-  #recmenu { position: absolute; top: 100%; left: 0; right: 0; z-index: 29; background: #fff; border: 1px solid #c5ccd4;
+  #recmenu { position: absolute; top: 100%; left: 0; right: 0; z-index: 50; background: #fff; border: 1px solid #c5ccd4;
              border-radius: 0 0 6px 6px; box-shadow: 0 6px 16px rgba(0,0,0,.12); max-height: 260px; overflow-y: auto; }
   #recmenu .row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; font-size: 13.5px; cursor: pointer; }
   #recmenu .row:hover { background: #eaf3fc; }
@@ -183,9 +184,12 @@
           <button class="mapbtn gps" onclick="useMyLocation()" title="Use my current location"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><line x1="12" y1="1" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="1" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="23" y2="12"/></svg></button>
         </div>
         <div id="results" hidden></div>
-        <div id="recwrap">
-          <button id="recbtn" onclick="toggleRecents()" title="Recent locations"><span id="recbtnlabel"></span><span class="caret">▾</span></button>
-          <div id="recmenu" hidden></div>
+        <div id="recrow">
+          <div id="recwrap">
+            <button id="recbtn" onclick="toggleRecents()" title="Recent locations"><span id="recbtnlabel"></span><span class="caret">▾</span></button>
+            <div id="recmenu" hidden></div>
+          </div>
+          <button class="mapbtn gps" id="sharebtn" onclick="share()" title="Copy a link to this view"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>
         </div>
       </div>
       <label class="toggle" title="HRRR = High-Resolution Rapid Refresh, NOAA's 3 km US model, re-run every hour. It is usually the sharpest forecast for the next couple of days; the orange dashes show where it agrees or disagrees with the 3 Day and 10 Day models."><input type="checkbox" id="hrrrToggle"> <span class="dash"></span> <span id="hrrrhelp">HRRR</span> short-range overlay (next 2 days)</label>
@@ -314,10 +318,11 @@ function shareUrl() {
 }
 function share() {
   var url = shareUrl(), btn = $("sharebtn");
-  function flash(msg) {
+  function flash() {                         /* icon button: flash a check, then restore the icon */
     if (!btn) return;
-    btn.textContent = msg;
-    setTimeout(function () { btn.textContent = "share"; }, 1800);
+    var icon = btn.innerHTML;
+    btn.textContent = "✓";
+    setTimeout(function () { btn.innerHTML = icon; }, 1800);
   }
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(url).then(function () { flash("link copied"); },
@@ -704,8 +709,9 @@ function renderNow() {
   var sun = nextSunEvent();
   box.innerHTML = '<div class="nowcard"><div class="nowlabel">NOW</div><div class="nicon">' + ic[0] + '</div><div class="ntemp">' + Math.round(n.temperature_2m) + "°</div>" +
     '<div><div class="ncond">' + ic[1] + "</div>" +
-    '<div class="nsub">feels ' + Math.round(n.apparent_temperature) + "° · " + compass(n.wind_direction_10m) + " " +
-    Math.round(n.wind_speed_10m) + " mph · gusts " + Math.round(n.wind_gusts_10m) + "</div>" +
+    /* nbsp-tied segments: wraps land on the · separators, never inside "gusts 6" etc. */
+    '<div class="nsub">feels\u00A0' + Math.round(n.apparent_temperature) + "° · " + compass(n.wind_direction_10m) + "\u00A0" +
+    Math.round(n.wind_speed_10m) + "\u00A0mph · gusts\u00A0" + Math.round(n.wind_gusts_10m) + "</div>" +
     (sun ? '<div class="nsub">' + sun + "</div>" : "") + "</div></div>";
   box.style.display = "flex";
 }
@@ -987,7 +993,6 @@ function render() {
      no-break space newer browsers put before AM/PM */
   $("locmeta").innerHTML = latN + ", " + lonW + elev + " · updated " +
     data.fetched.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }).replace(/\s+/g, "").toLowerCase() +
-    ' · <button id="sharebtn" title="Copy a link to this view" onclick="share()">share</button>' +
     ' · <button title="Refresh" onclick="loadForecast()">refresh</button>';
   renderRecents();
   /* rendering can add/remove the page scrollbar, changing the available width; refit once */
@@ -1004,7 +1009,7 @@ function grid(s, sec, lo, hi, step, fmt) {
   for (var v = lo; v <= hi + 1e-9; v += step) {
     var y = sec.y + sec.h * (1 - (v - lo) / (hi - lo));
     s.push('<line x1="' + PADL + '" y1="' + y.toFixed(1) + '" x2="' + (W - PADR) + '" y2="' + y.toFixed(1) + '" stroke="' + COL.grid + '" stroke-width="1"/>');
-    s.push('<text x="' + (PADL - 5) + '" y="' + (y + 3.5).toFixed(1) + '" text-anchor="end" font-size="10" fill="#8a939c">' + fmt(v) + "</text>");
+    s.push('<text x="' + (PADL - 5) + '" y="' + (y + 3.5).toFixed(1) + '" text-anchor="end" font-size="10" fill="#1a1a1a">' + fmt(v) + "</text>");
   }
 }
 
@@ -1041,7 +1046,7 @@ function tipHTML(i) {
       (day.srS ? tl("☀", "rise " + day.srS + "am · set " + day.ssS + "pm") : "") +
       tl("🌡️", Math.round(data.temp[i]) + "°F · feels " + Math.round(data.feels[i]) + "°") +
       tl("💨", Math.round(data.wspd[i]) + " mph from " + compass(data.wdir[i]) +
-         " · gusts " + Math.round(data.wgst[i])) +
+         " · gusts\u00A0" + Math.round(data.wgst[i])) +
       tl("☁️", Math.round(data.cloud[i]) + "%" +
          (data.prob[i] !== null ? " · precip chance " + Math.round(data.prob[i]) + "%" : "")) +
       (data.vis[i] !== null ? tl("👁", "visibility " + (data.vis[i] >= 10 ? "10+ mi" : data.vis[i].toFixed(1) + " mi") +
