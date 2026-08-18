@@ -733,7 +733,7 @@ function render() {
     var spd = data.wspd[i], dir = data.wdir[i];
     if (spd === null || dir === null) continue;
     s.push('<g transform="translate(' + x(i).toFixed(1) + "," + yW(spd).toFixed(1) + ") rotate(" + ((dir + 180) % 360) + ')">' +
-           '<path d="M0,-6.4 L4.1,5.4 L0,2.5 L-4.1,5.4 Z" fill="' + COL.windArrow + '" stroke="#fff" stroke-width="0.6"/></g>');
+           '<path d="M0,-8.3 L5.3,7 L0,3.2 L-5.3,7 Z" fill="' + COL.windArrow + '" stroke="#fff" stroke-width="0.7"/></g>');
   }
   legend(s, SEC.wind, [[COL.windLine, "Wind Speed (mph) + direction"], [COL.gust, "Gusts (mph)"]].concat(hrrrLegend()));
 
