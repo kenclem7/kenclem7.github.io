@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""Regenerate weather3/index.html from weather10/index.html (DESIGN.md section 4).
+"""weather3/index.html is a BYTE-COPY of weather10/index.html (DESIGN.md section 4).
 
-  py tools/gen-weather3.py            regenerate weather3/index.html
-  py tools/gen-weather3.py --check    exit 1 if weather3 is stale (CI tripwire, no write)
+  py tools/gen-weather3.py            copy weather10/index.html -> weather3/index.html
+  py tools/gen-weather3.py --check    exit 1 if the two differ (CI tripwire, no write)
 
-Every needle count is asserted BEFORE any replace runs, so a weather10 edit that breaks
-a needle fails loudly here instead of silently shipping a stale or half-generated 3 Day
-page. The riskiest needle is the pagenav swap: a ~150-char exact-HTML substring that a
-whitespace or attribute change would quietly stop matching (str.replace does not error).
+Since 2026-08-18 the two forecast pages are one source file that branches on
+location.pathname at boot: IS3 sets HOURS 72 vs 240, DAYSN = HOURS/24 drives the api
+forecast_days and the "N Day Weather Forecast" title, and boot JS turns the current
+page's nav link into the inert .here chip. "Generating" weather3 is copying the file.
+The old needle-replace generator - and its whole silent-no-op failure class - is gone;
+its final form lives in the git history of this file.
 
-Comparison and output normalize CRLF to LF: with core.autocrlf the working tree holds
-CRLF while the committed bytes are LF either way (the line-ending trap, DESIGN.md
-section 4), so byte comparisons must happen in LF space to mean anything.
-"""
+Comparison and output are LF-normalized: with core.autocrlf the working tree holds CRLF
+while the committed bytes are LF (the line-ending trap, DESIGN.md section 4)."""
 import os
 import sys
 
@@ -20,52 +20,30 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "weather10", "index.html")
 DST = os.path.join(ROOT, "weather3", "index.html")
 
-PAGENAV10 = ('<a href="/weather3/">3 Day<span class="fc"> Forecast</span></a>'
-             '<span class="here">10 Day<span class="fc"> Forecast</span></span>')
-PAGENAV3 = ('<span class="here">3 Day<span class="fc"> Forecast</span></span>'
-            '<a href="/weather10/">10 Day<span class="fc"> Forecast</span></a>')
-
-REPLACES = [  # (needle in weather10, replacement, exact count required in weather10)
-    ("HOURS = 240", "HOURS = 72", 1),
-    ("forecast_days: 10", "forecast_days: 3", 2),
-    ("10 Day Weather Forecast", "3 Day Weather Forecast", 2),
-    (PAGENAV10, PAGENAV3, 1),
-]
-
 
 def read_lf(path):
     with open(path, encoding="utf-8", newline="") as f:
         return f.read().replace("\r\n", "\n")
 
 
-def generate():
-    s = read_lf(SRC)
-    for old, _new, n in REPLACES:
-        found = s.count(old)
-        assert found == n, (
-            "needle %r: expected %d occurrence(s) in weather10, found %d - "
-            "fix weather10/index.html or update this script AND DESIGN.md section 4"
-            % (old[:60], n, found)
-        )
-    for old, new, _n in REPLACES:
-        s = s.replace(old, new)
-    return s
-
-
 def main():
-    out = generate()
+    src = read_lf(SRC)
+    assert 'location.pathname.indexOf("/weather3")' in src, (
+        "weather10/index.html no longer carries the IS3 pathname branch - a plain copy "
+        "would ship a broken 3 Day page; restore the branch or rethink section 4"
+    )
     if "--check" in sys.argv:
-        if read_lf(DST) != out:
+        if read_lf(DST) != src:
             sys.stderr.write(
-                "weather3/index.html is stale: run  py tools/gen-weather3.py  and commit it "
-                "alongside the weather10 change\n"
+                "weather3/index.html differs from weather10/index.html: it is a byte-copy - "
+                "run  py tools/gen-weather3.py  and commit both together (never hand-edit weather3)\n"
             )
             sys.exit(1)
-        print("weather3/index.html is in sync with weather10/index.html")
+        print("weather3/index.html is a faithful copy of weather10/index.html")
         return
     with open(DST, "w", encoding="utf-8", newline="") as f:
-        f.write(out)
-    print("wrote weather3/index.html (%d chars)" % len(out))
+        f.write(src)
+    print("copied weather10/index.html -> weather3/index.html (%d chars)" % len(src))
 
 
 if __name__ == "__main__":

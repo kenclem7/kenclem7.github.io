@@ -198,9 +198,9 @@
   <div class="card">
     <header>
       <div class="titleblock">
-        <h1 id="title">10 Day Weather Forecast</h1>
+        <h1 id="title">Weather Forecast</h1>  <!-- neutral: boot renderTitle() writes the real "N Day" title before paint -->
         <div id="locmeta"></div>
-        <div id="pagenav"><span class="here daily">Daily</span><a href="/weather3/">3 Day<span class="fc"> Forecast</span></a><span class="here">10 Day<span class="fc"> Forecast</span></span><a href="/weather365/">Historical</a></div>
+        <div id="pagenav"><span class="here daily">Daily</span><a href="/weather3/">3 Day<span class="fc"> Forecast</span></a><a href="/weather10/">10 Day<span class="fc"> Forecast</span></a><a href="/weather365/">Historical</a></div>
       </div>
       <div id="nowbox"></div>
       <div class="searchwrap">
@@ -252,7 +252,10 @@
 <script>
 "use strict";
 /* ---------- constants ---------- */
-var PADL = 64, PADR = 12, HOURS = 240, DAYSN = HOURS / 24;   /* PADL also holds the drag handles */
+var IS3 = location.pathname.indexOf("/weather3") === 0;      /* ONE file serves /weather10/ and /weather3/
+                                                                (byte-identical, tools/gen-weather3.py copies):
+                                                                the URL decides the window, DESIGN.md section 4 */
+var PADL = 64, PADR = 12, HOURS = IS3 ? 72 : 240, DAYSN = HOURS / 24;   /* PADL also holds the drag handles */
 /* chart heights are user-resizable via corner grips; the minimum for every row is MINH below.
    Width is automatic: charts fill the browser (1080 floor scrolls sideways on small screens). */
 var STDH = 140;                              /* the standard chart row height (per Ken 2026-08-18) */
@@ -511,9 +514,9 @@ function loadForecast() {
   $("status").textContent = "Loading forecast for " + locLabel(loc) + "…";
   setLoading(true);
   Promise.all([
-    api({ models: "ecmwf_ifs025", forecast_days: 10,
+    api({ models: "ecmwf_ifs025", forecast_days: DAYSN,
           hourly: "temperature_2m,apparent_temperature,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m" }),
-    api({ forecast_days: 10, hourly: "precipitation_probability,visibility,uv_index", daily: "sunrise,sunset",
+    api({ forecast_days: DAYSN, hourly: "precipitation_probability,visibility,uv_index", daily: "sunrise,sunset",
           current: "temperature_2m,apparent_temperature,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m,is_day" }),
     api({ models: "gfs_hrrr", forecast_days: 3,
           hourly: "temperature_2m,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m" })
@@ -828,7 +831,7 @@ function setTitle(city, tiedPhrase) {
 /* unbreakable phrase (nbsp); bullet separator only when the whole title fits one line.
    Called at boot too, so phones never flash the static h1 before the first render. */
 function renderTitle() {
-  var tsuf = DAILY ? "Daily Weather Forecast" : "10 Day Weather Forecast";
+  var tsuf = DAILY ? "Daily Weather Forecast" : DAYSN + " Day Weather Forecast";
   setTitle(locLabel(loc), tsuf.replace(/ /g, "\u00A0"));
 }
 
@@ -1633,6 +1636,17 @@ $("hrrrToggle").checked = showHrrr;
 $("hrrrToggle").addEventListener("change", function () {
   showHrrr = this.checked; save("bw_hrrr", showHrrr); render();
 });
+(function () {                                 /* one source, two pages: the current page's nav link becomes
+                                                  the inert .here chip, so the DOM matches the old static nav
+                                                  and every existing CSS selector keeps working */
+  var a = document.querySelector('#pagenav a[href^="' + (IS3 ? "/weather3/" : "/weather10/") + '"]');
+  if (a) {
+    var here = document.createElement("span");
+    here.className = "here";
+    here.innerHTML = a.innerHTML;
+    a.parentNode.replaceChild(here, a);
+  }
+})();
 placeNav();
 renderTitle();                                 /* the right title before any data lands */
 wireSearch();
