@@ -744,9 +744,17 @@ function setTitle(city, tiedPhrase) {
   el.style.whiteSpace = "nowrap";
   var rg = document.createRange();
   rg.selectNodeContents(el);                   /* fractional widths: integer scrollWidth dropped the bullet a pixel early */
-  var fits = rg.getBoundingClientRect().width <= el.getBoundingClientRect().width + 0.5;
+  var textW = rg.getBoundingClientRect().width, elR = el.getBoundingClientRect();
+  /* the title column is narrow (equal 1fr sides center the NOW card), but the gap left of
+     the card is genuinely empty: a one-line title may run into it, up to 16px shy of the card */
+  var limit = elR.width, nb = $("nowbox"), nbR;
+  if (nb && nb.style.display !== "none") {
+    nbR = nb.getBoundingClientRect();
+    if (nbR.top < elR.bottom && nbR.left > elR.left) limit = Math.max(limit, nbR.left - 16 - elR.left);
+  }
+  if (textW <= limit + 0.5) return;            /* keep the bullet + nowrap so it may use the gap */
   el.style.whiteSpace = "";
-  if (!fits) el.textContent = city + " " + tiedPhrase;
+  el.textContent = city + " " + tiedPhrase;
 }
 
 /* unbreakable phrase (nbsp); bullet separator only when the whole title fits one line.
@@ -1015,9 +1023,9 @@ function render() {
     $("dayprev").disabled = viewDay <= 0;
     $("daynext").disabled = viewDay >= DAYSN - 1;
   } else closeCard();                          /* leaving daily mode dismisses the reading card */
-  renderTitle();
   document.title = locLabel(loc, true) + " · Weather Chart";
   renderNow();
+  renderTitle();                               /* after renderNow: the gap measurement needs the NOW card placed */
   var latN = Math.abs(loc.lat).toFixed(2) + "°" + (loc.lat >= 0 ? "N" : "S");
   var lonW = Math.abs(loc.lon).toFixed(2) + "°" + (loc.lon >= 0 ? "E" : "W");
   var elev = loc.elev !== undefined && loc.elev !== null ? " · Elev " + Math.round(loc.elev * 3.28084) + " ft" : "";
