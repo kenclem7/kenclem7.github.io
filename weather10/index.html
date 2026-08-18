@@ -116,6 +116,8 @@
   #tip .t { font-weight: 600; }
   #tip .hrrr { color: #b35c00; font-size: 17px; }
   #tip .tipdiv { border-top: 1px solid #d7dde3; margin: 7px 0 5px; }
+  #tip .tl { display: flex; gap: 7px; align-items: baseline; }
+  #tip .em { flex: 0 0 26px; text-align: center; }
   #chart .rsz { cursor: ns-resize; touch-action: none; }
   #chart .rsz:hover line { stroke: #5b6672; }
   #chart .drag { cursor: grab; touch-action: none; }
@@ -314,6 +316,7 @@ function aqiWord(v) {
          v <= 200 ? "unhealthy" : v <= 300 ? "very unhealthy" : "hazardous";
 }
 function uvWord(v) { return v < 3 ? "low" : v < 6 ? "moderate" : v < 8 ? "high" : v < 11 ? "very high" : "extreme"; }
+function sgnFt(v) { return (v >= 0 ? "+" : "") + v.toFixed(1); }   /* tide heights always signed */
 function uvColor(v) { return v < 3 ? "#3e8e41" : v < 6 ? "#c08a12" : v < 8 ? "#e07408" : v < 11 ? "#cf3049" : "#8f4bab"; }
 
 /* WMO weather code + cloud % -> icon and wording for the day strip */
@@ -791,7 +794,7 @@ function render() {
       s.push('<circle cx="' + ex.toFixed(1) + '" cy="' + ey.toFixed(1) + '" r="2.6" fill="' + COL.tideLine + '"/>');
       s.push('<text x="' + ex.toFixed(1) + '" y="' + (ey + (up ? -7 : 15)).toFixed(1) +
              '" text-anchor="middle" font-size="10.5" fill="' + COL.tideLine + '">' +
-             e.v.toFixed(1) + "' " + fmtClock(e.i) + "</text>");
+             sgnFt(e.v) + "' " + fmtClock(e.i) + "</text>");
     });
     var tideLegend = [[COL.tideFill, "Tide (ft, " + td.station + ", " + td.mi + " mi)"]];
     if (td.cur && td.cur.v) {                  /* current shares the row on its own ± scale */
@@ -923,26 +926,29 @@ function bindPointer() {
     var i = Math.max(0, Math.min(HOURS - 1, Math.round((px - PADL) / PLOTW * HOURS - 0.5)));
     xh.setAttribute("x1", x(i)); xh.setAttribute("x2", x(i)); xh.setAttribute("opacity", "1");
     var t = data.times[i], hr = +t.slice(11, 13), day = data.days[Math.floor(i / 24)];
+    var tl = function (em, body) {            /* one card line: fixed-width emoji cell, aligned text */
+      return '<div class="tl"><span class="em">' + em + '</span><span>' + body + "</span></div>";
+    };
     var html = '<div class="t">' + day.label + ", " + fmtHour(hr) + "</div>" +
-      (day.srS ? "☀ rise " + day.srS + "am · set " + day.ssS + "pm<br>" : "") +
-      "🌡️ " + Math.round(data.temp[i]) + "°F · feels " + Math.round(data.feels[i]) + "°<br>" +
-      "💨 " + Math.round(data.wspd[i]) + " mph from " + compass(data.wdir[i]) +
-      " · gusts " + Math.round(data.wgst[i]) + "<br>" +
-      "☁️ " + Math.round(data.cloud[i]) + "%" +
-      (data.prob[i] !== null ? " · precip chance " + Math.round(data.prob[i]) + "%" : "") + "<br>" +
-      (data.vis[i] !== null ? "👁 visibility " + (data.vis[i] >= 10 ? "10+ mi" : data.vis[i].toFixed(1) + " mi") +
-        (data.vis[i] < 1 ? " (fog)" : "") + "<br>" : "") +
+      (day.srS ? tl("☀", "rise " + day.srS + "am · set " + day.ssS + "pm") : "") +
+      tl("🌡️", Math.round(data.temp[i]) + "°F · feels " + Math.round(data.feels[i]) + "°") +
+      tl("💨", Math.round(data.wspd[i]) + " mph from " + compass(data.wdir[i]) +
+         " · gusts " + Math.round(data.wgst[i])) +
+      tl("☁️", Math.round(data.cloud[i]) + "%" +
+         (data.prob[i] !== null ? " · precip chance " + Math.round(data.prob[i]) + "%" : "")) +
+      (data.vis[i] !== null ? tl("👁", "visibility " + (data.vis[i] >= 10 ? "10+ mi" : data.vis[i].toFixed(1) + " mi") +
+        (data.vis[i] < 1 ? " (fog)" : "")) : "") +
       (data.uv && data.uv[i] !== null && data.uv[i] >= 0.5 ?
-        '🕶️ <span style="color:' + uvColor(Math.round(data.uv[i])) + '">UV ' + Math.round(data.uv[i]) + " · " +
-        uvWord(Math.round(data.uv[i])) + "</span><br>" : "") +
-      "💧 Accum " + fmtIn(data.accum[i]) + " in" +
-      (data.tide && data.tide.h[i] !== null ? "<br>🌊 tide " + data.tide.h[i].toFixed(1) + " ft" +
+        tl("🕶️", '<span style="color:' + uvColor(Math.round(data.uv[i])) + '">UV ' + Math.round(data.uv[i]) + " · " +
+        uvWord(Math.round(data.uv[i])) + "</span>") : "") +
+      tl("💧", "Accum " + fmtIn(data.accum[i]) + " in") +
+      (data.tide && data.tide.h[i] !== null ? tl("🌊", "tide " + sgnFt(data.tide.h[i]) + " ft" +
         (data.tide.cur && data.tide.cur.v && data.tide.cur.v[i] !== null && data.tide.cur.v[i] !== undefined ?
           " · current " + Math.abs(data.tide.cur.v[i]).toFixed(1) + " kn " +
-          (data.tide.cur.v[i] >= 0 ? "flood" : "ebb") : "") : "") +
-      (data.wtemp && data.wtemp[i] !== null ? "<br>≋ water " + Math.round(data.wtemp[i]) + "°F" : "") +
-      (data.aqi && data.aqi[i] !== null ? "<br>😷 AQI " + Math.round(data.aqi[i]) + " (" + aqiWord(data.aqi[i]) + ")" +
-        (data.pm25 && data.pm25[i] !== null ? " · PM2.5 " + Math.round(data.pm25[i]) : "") : "");
+          (data.tide.cur.v[i] >= 0 ? "flood" : "ebb") : "")) : "") +
+      (data.wtemp && data.wtemp[i] !== null ? tl("≋", "water " + Math.round(data.wtemp[i]) + "°F") : "") +
+      (data.aqi && data.aqi[i] !== null ? tl("😷", "AQI " + Math.round(data.aqi[i]) + " (" + aqiWord(data.aqi[i]) + ")" +
+        (data.pm25 && data.pm25[i] !== null ? " · PM2.5 " + Math.round(data.pm25[i]) : "")) : "");
     if (showHrrr && data.hrrr.wspd[i] !== null) {
       html += '<div class="tipdiv"></div><span class="hrrr">HRRR: ' + Math.round(data.hrrr.wspd[i]) + " mph from " +
               compass(data.hrrr.wdir[i]) + " · " + Math.round(data.hrrr.temp[i]) + "° · cloud " +
