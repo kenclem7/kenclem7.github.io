@@ -134,4 +134,4 @@ Share-link visits never write `bw_current`, so opening someone's link does not c
 
 ## 9. House copy rules
 
-- "N Day Forecast" (no hyphen, capital D), "homepage" not "landing page", lowercase tight am/pm on sun times ("6:05am"), no em dashes in copy.
+- "N Day Forecast" (no hyphen, capital D), "homepage" not "landing page", lowercase tight am/pm on sun times and the header's "updated" stamp ("6:05am", "updated 7:18am"), no em dashes in copy.

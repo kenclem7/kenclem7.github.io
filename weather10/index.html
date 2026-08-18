@@ -983,8 +983,10 @@ function render() {
   var latN = Math.abs(loc.lat).toFixed(2) + "°" + (loc.lat >= 0 ? "N" : "S");
   var lonW = Math.abs(loc.lon).toFixed(2) + "°" + (loc.lon >= 0 ? "E" : "W");
   var elev = loc.elev !== undefined && loc.elev !== null ? " · Elev " + Math.round(loc.elev * 3.28084) + " ft" : "";
+  /* house copy style: lowercase tight am/pm ("7:18am"); \s+ also catches the narrow
+     no-break space newer browsers put before AM/PM */
   $("locmeta").innerHTML = latN + ", " + lonW + elev + " · updated " +
-    data.fetched.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) +
+    data.fetched.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }).replace(/\s+/g, "").toLowerCase() +
     ' · <button id="sharebtn" title="Copy a link to this view" onclick="share()">share</button>' +
     ' · <button title="Refresh" onclick="loadForecast()">⟳ refresh</button>';
   renderRecents();
