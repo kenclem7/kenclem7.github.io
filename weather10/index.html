@@ -736,6 +736,17 @@ function placeNav() {
   else if (nav.parentNode !== tb) tb.appendChild(nav);
 }
 
+/* one-line titles read "City · Phrase"; when the title would wrap, the bullet is dropped and
+   the whole phrase falls to the next line (phrase internals are nbsp-tied by the caller) */
+function setTitle(city, tiedPhrase) {
+  var el = $("title");
+  el.textContent = city + " · " + tiedPhrase;
+  el.style.whiteSpace = "nowrap";
+  var fits = el.scrollWidth <= el.clientWidth + 1;
+  el.style.whiteSpace = "";
+  if (!fits) el.textContent = city + " " + tiedPhrase;
+}
+
 /* ---------- render ---------- */
 function render() {
   if (!data) return;
@@ -995,9 +1006,9 @@ function render() {
     $("dayprev").disabled = viewDay <= 0;
     $("daynext").disabled = viewDay >= DAYSN - 1;
   } else closeCard();                          /* leaving daily mode dismisses the reading card */
-  /* the whole forecast phrase is one unbreakable unit (nbsp): a long city wraps BEFORE it */
+  /* unbreakable phrase (nbsp); bullet separator only when the whole title fits one line */
   var tsuf = DAILY ? "Daily Weather Forecast" : "10 Day Weather Forecast";
-  $("title").textContent = locLabel(loc) + " " + tsuf.replace(/ /g, "\u00A0");
+  setTitle(locLabel(loc), tsuf.replace(/ /g, "\u00A0"));
   document.title = locLabel(loc, true) + " · Weather Chart";
   renderNow();
   var latN = Math.abs(loc.lat).toFixed(2) + "°" + (loc.lat >= 0 ? "N" : "S");
