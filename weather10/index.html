@@ -7,8 +7,10 @@
      stop the page being framed (security review finding 06, open). script-src has to keep unsafe-inline
      because the markup carries inline onclick handlers, which a script hash cannot cover; hashing would mean
      moving all of them to addEventListener first. What it does buy is connect-src and img-src: injected
-     script cannot phone home to a host that is not on this list. Every host here is one the page really
-     calls (see DESIGN.md section 3). Add to this list when adding an API, or the call fails.
+     script cannot phone home to a host that is not on this list. Add to it when adding an API, or the
+     call fails. The list is SHARED by the three chart pages, so no single page calls all of it: archive-api
+     is weather365 only, and the forecast, marine, air-quality and NOAA hosts are the forecast pages only.
+     Do not prune it to what one page uses (see DESIGN.md section 3).
      api-bdc.io is here because api.bigdatacloud.net answers with a 307 to it, and CSP is enforced on the
      redirect target as well as the request: with only the documented host listed, every water-naming
      lookup was refused. Checked 2026-08-18, it is the only one of the nine hosts that redirects. -->
