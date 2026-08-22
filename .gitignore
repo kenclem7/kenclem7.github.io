@@ -1,0 +1,17 @@
+# Python bytecode from tools/. Running a script does not leave any behind, but importing one or
+# compiling it (py_compile, a linter, an editor's language server) writes tools/__pycache__/, which
+# then shows up as untracked noise in a repo where every other file is deliberate.
+__pycache__/
+*.py[cod]
+
+# File-manager droppings. Nothing generates these on purpose; they just arrive.
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Do NOT add broad dotfile or dot-directory patterns here. Four dotfiles in this repo are tracked on
+# purpose and the site breaks in quiet ways without them: .claude/launch.json (the dev server entry,
+# see DESIGN.md section 2), .gitattributes (keeps git from rewriting the vendored Leaflet line endings
+# and silently invalidating the SRI digests, section 3), .github/workflows/check.yml (the weather3
+# copy tripwire, section 8), and .nojekyll, without which GitHub Pages runs the whole site through
+# Jekyll.
