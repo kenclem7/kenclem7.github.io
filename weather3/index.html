@@ -236,7 +236,7 @@
         <div id="chart"></div>
       </div>
     </div>
-    <div class="foot">Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> · forecast: ECMWF model · orange dashes: NOAA HRRR (short-range) · precip chance from ensemble blend · updates hourly on the half hour</div>
+    <div class="foot">Weather data by <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> under <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a> · forecast: <span id="footmodel">NOAA NBM model</span> · orange dashes: NOAA HRRR (short-range) · precip chance from ensemble blend · updates hourly on the half hour</div>
     <div class="foot">Location privacy: the place you pick is sent to Open-Meteo for the forecast, to OpenStreetMap Nominatim and to BigDataCloud for place names, and to OpenStreetMap for map tiles. The search box sends what you type, not your coordinates. NOAA receives only a tide station id, never your location: the nearest station is worked out on your device. This site has no analytics and no server of its own, and your saved cities stay in this browser.</div>
   </div>
 </div>
@@ -499,9 +499,45 @@ function api(params) {
   u.set("timezone", "auto"); u.set("temperature_unit", "fahrenheit");
   u.set("wind_speed_unit", "mph"); u.set("precipitation_unit", "inch");
   return fetch("https://api.open-meteo.com/v1/forecast?" + u).then(function (r) {
-    if (!r.ok) throw new Error("HTTP " + r.status);
+    if (!r.ok) {
+      /* Open-Meteo answers a 4xx with an error object in the body carrying a "reason" string.
+         Throwing a bare "HTTP 400" threw that away, and the backbone fallback below has to tell
+         the one 400 that means "this spot is off that model's grid" apart from a 400 we caused
+         ourselves with a malformed request. The reason also reads better in the error banner. */
+      return r.json().catch(function () { return null; }).then(function (j) {
+        var err = new Error("HTTP " + r.status + (j && j.reason ? ": " + j.reason : ""));
+        err.status = r.status;
+        err.reason = (j && j.reason) || "";
+        throw err;
+      });
+    }
     return r.json();
   });
+}
+
+/* The backbone call decides the whole page: build() takes its hourly.time as the time axis and joins
+   every other series onto that index by timestamp, so whichever model answers here owns the numbers.
+   NBM is NOAA's National Blend of Models on a 2.5 km grid. ECMWF's grid is 25 km, which at San Diego
+   snapped the forecast to a point about 15 km inland and ran hot with it: measured against station
+   highs at eight West Coast sites over 2026-08-14..21 the mean daily-high error was 2.0F for NBM and
+   4.8F for ECMWF (9.1F at San Diego, 11.0F at Los Angeles). NBM is CONUS-only, so ECMWF stays on as
+   the model for everywhere else rather than being dropped. */
+var BACKBONE_HOURLY = "temperature_2m,apparent_temperature,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m";
+function backbone() {
+  return api({ models: "ncep_nbm_conus", forecast_days: DAYSN, hourly: BACKBONE_HOURLY })
+    .catch(function (e) {
+      /* Fall back ONLY on the one answer that means out of coverage: HTTP 400 carrying the reason
+         "No data is available for this location" (what London returns). A bare .catch() here would
+         also swallow a request we broke ourselves and silently serve the 15 km-inland ECMWF forecast
+         instead - which is the exact bug this change exists to fix, and it would be invisible while
+         it happened. Anything else rethrows and the page shows the error, reason and all. */
+      if (!(e && e.status === 400 && (e.reason || "").indexOf("No data is available") === 0)) throw e;
+      return api({ models: "ecmwf_ifs025", forecast_days: DAYSN, hourly: BACKBONE_HOURLY })
+        .then(function (j) { j.fellBack = true; return j; });   /* flagged on the payload, not in a
+                                                                   global: a slow reply from a load
+                                                                   we already abandoned must not
+                                                                   relabel the footer of this one */
+    });
 }
 
 function loadForecast() {
@@ -512,8 +548,7 @@ function loadForecast() {
   $("status").textContent = "Loading forecast for " + locLabel(loc) + "…";
   setLoading(true);
   Promise.all([
-    api({ models: "ecmwf_ifs025", forecast_days: DAYSN,
-          hourly: "temperature_2m,apparent_temperature,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m" }),
+    backbone(),
     api({ forecast_days: DAYSN, hourly: "precipitation_probability,visibility,uv_index", daily: "sunrise,sunset",
           current: "temperature_2m,apparent_temperature,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m,is_day" }),
     api({ models: "gfs_hrrr", forecast_days: 3,
@@ -528,6 +563,7 @@ function loadForecast() {
   ]).then(function (res) {
     if (token !== fetchToken) return;
     build(res[0], res[1], res[2], res[3], res[4]);
+    $("footmodel").textContent = res[0].fellBack ? "ECMWF model (outside NBM coverage)" : "NOAA NBM model";
     $("status").textContent = "";
     render();
     setLoading(false);
@@ -537,7 +573,9 @@ function loadForecast() {
     renderTitle();                           /* recents already show the new city: keep the h1/tab honest too */
     document.title = locLabel(loc, true) + " \u00b7 Weather Chart";
     $("status").innerHTML = '<span class="err">Could not load the forecast (' + esc(e.message) +
-      ').</span><button onclick="loadForecast()">Try again</button>';
+      ').</span> <button onclick="loadForecast()">Try again</button>';
+    $("footmodel").textContent = "not loaded";   /* nothing is on the chart, so the footer must stop
+                                                    naming the model that would have supplied it */
     setLoading(false);
   });
 }
@@ -671,7 +709,11 @@ function build(ec, pr, hr, mar, aq) {
 
   /* align ensemble probability + HRRR overlay onto the primary hour index */
   var prob = new Array(times.length).fill(null);
-  var vis = new Array(times.length).fill(null);      /* ECMWF carries no visibility; this is best-match */
+  var vis = new Array(times.length).fill(null);      /* visibility rides on the best-match call, not the
+                                                        backbone: ECMWF published none at all (verified,
+                                                        all nulls), and keeping one source means the row
+                                                        does not change character when the backbone
+                                                        falls back to ECMWF outside CONUS */
   var uv = new Array(times.length).fill(null);
   if (pr && pr.hourly) for (var p = 0; p < pr.hourly.time.length; p++) {
     var pi = byTime[pr.hourly.time[p]];
