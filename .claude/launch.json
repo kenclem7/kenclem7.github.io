@@ -1,11 +1,18 @@
 {
+  // autoPort lets Claude pick a free port when 3463 is taken, which happens whenever a second
+  // session or worktree is already serving this repo. Claude passes its choice in $PORT, and
+  // `python -m http.server` takes the port positionally and ignores the environment - so the
+  // command is tools/serve.py, which reads $PORT. See the docstring there for what breaks
+  // without it. Nothing here needs a fixed port: the pages are static, the CSP uses
+  // origin-relative 'self', and no OAuth callback or CORS allowlist is pinned to 3463.
   "version": "0.0.1",
   "configurations": [
     {
       "name": "weatherchart-worktree",
       "runtimeExecutable": "py",
-      "runtimeArgs": ["-m", "http.server", "3463", "--bind", "127.0.0.1", "--directory", "."],
-      "port": 3463
+      "runtimeArgs": ["tools/serve.py"],
+      "port": 3463,
+      "autoPort": true
     }
   ]
 }
