@@ -982,16 +982,33 @@ function render() {
                         yD(0).toFixed(1) + '" stroke="#9fb6c4" stroke-width="1" stroke-dasharray="3 3"/>');
     s.push('<path d="' + areaPath(td.h, yD, SEC.tide.y + SEC.tide.h) + '" fill="' + COL.tideFill +
            '" opacity=".8" stroke="' + COL.tideLine + '" stroke-width="1.5"' + CP + '/>');
+    /* whose water this is, captioned inside the plot instead of only in the right-edge legend
+       (per Ken 2026-08-22): on a wide chart that legend sits a screen away from the TIDE title, so an
+       inland city read Elliott Bay's tides as its own. Black (#111, the row titles' black) rather than
+       legend grey, per Ken 2026-08-22. Phones keep the first comma-part of the station name (same
+       convention as map water naming) and drop the "from <city>" tail for width. */
+    var stName = DAILY ? td.station.split(",")[0] : td.station;
+    var capHead = DAILY ? "" : "Tides at ";
+    var capTail = " \u00B7 " + td.mi + " mi" + (DAILY ? "" : " from " + locLabel(loc, true));
+    var capRoom = Math.floor((PLOTW - 12) / 6.1) - capHead.length - capTail.length;   /* the legend's char estimate */
+    if (stName.length > capRoom) stName = stName.slice(0, Math.max(4, capRoom - 1)) + "\u2026";
+    var capText = capHead + stName + capTail, capY = SEC.tide.y + 14;
+    var capR = PADL + 6 + capText.length * 6.1;   /* same estimate, and generous: it only nudges labels */
     td.events.forEach(function (e) {           /* label each high and low with its time */
       var ex = x(e.i), ey = yD(e.v), up = e.type === "H";   /* windowed x, so daily mode drops off-day events */
       if (ex < PADL || ex > W - PADR) return;
+      var lab = sgnFt(e.v) + "' " + fmtClock(e.i), half = lab.length * 2.9 + 3;
+      /* a high cresting under the caption would print its label behind it: that one label goes below
+         its dot instead, the same side the lows use */
+      if (up && ey > SEC.tide.y + 7 && ey < SEC.tide.y + 36 && ex - half < capR && ex + half > PADL + 6) up = false;
       s.push('<circle cx="' + ex.toFixed(1) + '" cy="' + ey.toFixed(1) + '" r="2.6" fill="' + COL.tideLine + '"/>');
       s.push('<text x="' + ex.toFixed(1) + '" y="' + (ey + (up ? -7 : 15)).toFixed(1) +
-             '" text-anchor="middle" font-size="10.5" fill="' + COL.tideLine + '">' +
-             sgnFt(e.v) + "' " + fmtClock(e.i) + "</text>");
+             '" text-anchor="middle" font-size="10.5" fill="' + COL.tideLine + '">' + lab + "</text>");
     });
-    /* phones: first comma-part of the station name (same convention as map water naming) */
-    var tideLegend = [[COL.tideFill, "Tide (ft, " + (DAILY ? td.station.split(",")[0] : td.station) + ", " + td.mi + " mi)"]];
+    s.push('<text x="' + (PADL + 6) + '" y="' + capY + '" font-size="11" fill="#111"' +
+           ' paint-order="stroke" stroke="#fff" stroke-width="3.5" stroke-linejoin="round">' +
+           esc(capText) + "</text>");
+    var tideLegend = [[COL.tideFill, "Tide (ft)"]];
     if (td.cur && td.cur.v) {                  /* current shares the row on its own ± scale */
       var cmax = 0;
       td.cur.v.forEach(function (v) { if (v !== null && Math.abs(v) > cmax) cmax = Math.abs(v); });
