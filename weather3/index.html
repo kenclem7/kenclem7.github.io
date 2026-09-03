@@ -1010,7 +1010,10 @@ function render() {
     if (data.vis[i] === null || data.vis[i] === undefined) continue;
     hasVis = true; vmax = Math.max(vmax, Math.min(data.vis[i], 10));
   }
-  var vrun = ladder(vmax, [2.5, 5, 10], [0.5, 1, 2.5]), VMAX = vrun[0];
+  /* With no data at all the ladder would bottom out at 2.5 mi, and an empty row under a 2.5 mi
+     ceiling reads as a permanently fogged-in place rather than an unknown one. Keep the old full
+     scale for the empty state, where no axis means anything anyway. */
+  var vrun = hasVis ? ladder(vmax, [2.5, 5, 10], [0.5, 1, 2.5]) : [10, 2.5], VMAX = vrun[0];
   var yV = function (v) { return SEC.vis.y + SEC.vis.h * (1 - Math.min(v, VMAX) / VMAX); };
   grid(s, SEC.vis, 0, VMAX, vrun[1], function (v) { return v + " mi"; });
   if (hasVis) {

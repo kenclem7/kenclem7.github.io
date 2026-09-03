@@ -20,7 +20,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def main():
-    port = os.environ.get("PORT") or (sys.argv[1] if len(sys.argv) > 1 else "3463")
+    # An explicit argument wins over the environment. The other order looks equivalent but is not:
+    # PORT is commonly exported for unrelated tooling, and it silently swallowed the very argument
+    # this docstring tells you to pass, leaving the server on some other port with no error.
+    port = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("PORT") or "3463"
     try:
         port = int(port)
     except ValueError:

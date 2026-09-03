@@ -22,3 +22,7 @@ jobs:
       # This SHA is v4.4.0. Bump the SHA and the trailing comment together.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - run: python3 tools/gen-weather3.py --check
+      # The offline half only: it reads the tree and shells out to node, never the network.
+      # The --live half is deliberately NOT here - see the docstring in tools/test-weather.py
+      # for why, and for the one thing it checks that nothing else can.
+      - run: python3 tools/test-weather.py
