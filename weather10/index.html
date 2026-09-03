@@ -424,6 +424,14 @@ function niceTop(m) {
   var d = Math.ceil(m / k);
   return d * k;
 }
+/* Axis top and gridline step off a ladder of round numbers: the lowest rung at or above the data's
+   max, paired with a step that divides that rung exactly so the top gridline always lands on the
+   axis top rather than being dropped by grid()'s loop. Wind is deliberately NOT on a ladder - it
+   tops at the exact max gust, which is Ken's rule and predates this (DESIGN.md section 5). */
+function ladder(m, rungs, steps) {
+  for (var i = 0; i < rungs.length - 1; i++) if (m <= rungs[i]) return [rungs[i], steps[i]];
+  return [rungs[rungs.length - 1], steps[steps.length - 1]];
+}
 function fmtHour(h) { var ap = h < 12 ? "AM" : "PM"; var v = h % 12; if (v === 0) v = 12; return v + " " + ap; }
 function fmtClock(i) {                       /* fractional hour column -> "10:13am" */
   var h = Math.floor(i) % 24, m = Math.round((i - Math.floor(i)) * 60);
@@ -977,18 +985,34 @@ function render() {
   legend(s, SEC.cloud, [[COL.cloudFill, "Cloud Cover (%)"], [COL.probFill, "Chance of Precip. (%)"]].concat(hrrrLegend()));
 
   /* ---- precip accumulation ---- */
-  var amax = data.accum[HOURS - 1];
-  var atop = amax <= 1 ? 1 : niceTop(amax);
+  /* The axis sat at a full inch whenever the period total was under one, so a dry week drew as a
+     flat line along the floor with seven eighths of the row empty. It climbs a ladder of round
+     totals now, and a 0.17 in week gets a 0.25 in axis. Scanned rather than read off
+     accum[HOURS - 1]: a null tail past the model's range would otherwise read as no rain at all. */
+  var amax = 0;
+  for (i = 0; i < HOURS; i++) if (data.accum[i] !== null && data.accum[i] !== undefined) amax = Math.max(amax, data.accum[i]);
+  var arun = amax > 10 ? [niceTop(amax), niceTop(amax) / 4]
+                       : ladder(amax, [0.1, 0.25, 0.5, 1, 2, 3, 5, 10], [0.02, 0.05, 0.1, 0.25, 0.5, 0.5, 1, 2.5]);
+  var atop = arun[0], astep = arun[1];
+  var adec = Math.round(astep * 100) % 10 === 0 ? 1 : 2;   /* or a 0.25 gridline prints as "0.3" */
   var yA = function (v) { return SEC.accum.y + SEC.accum.h * (1 - v / atop); };
-  grid(s, SEC.accum, 0, atop, atop / 2, function (v) { return v.toFixed(1); });
+  grid(s, SEC.accum, 0, atop, astep, function (v) { return v.toFixed(adec); });
   s.push('<path d="' + areaPath(data.accum, yA, SEC.accum.y + SEC.accum.h) + '" fill="' + COL.accumFill + '" opacity=".55" stroke="' + COL.accumLine + '" stroke-width="1.2"' + CP + '/>');
   s.push('<path d="' + linePath(data.precip, yA) + '" fill="none" stroke="' + COL.hourlyP + '" stroke-width="1.5"' + CP + '/>');
   legend(s, SEC.accum, [[COL.accumFill, "Precip. Accum. Total (in)"], [COL.hourlyP, "Hourly Precip. (in)"]]);
 
   /* ---- visibility / fog ---- */
-  var VMAX = 10, hasVis = data.vis.some(function (v) { return v !== null; });
+  /* Ten miles is the ceiling the data itself reports ("10+"), but pinning the axis there wasted the
+     row on any period that never cleared. The rungs stop at 2.5 mi so the 1 mi fog line can never
+     become the ceiling with the band filling most of the row. */
+  var vmax = 0, hasVis = false;
+  for (i = 0; i < HOURS; i++) {
+    if (data.vis[i] === null || data.vis[i] === undefined) continue;
+    hasVis = true; vmax = Math.max(vmax, Math.min(data.vis[i], 10));
+  }
+  var vrun = ladder(vmax, [2.5, 5, 10], [0.5, 1, 2.5]), VMAX = vrun[0];
   var yV = function (v) { return SEC.vis.y + SEC.vis.h * (1 - Math.min(v, VMAX) / VMAX); };
-  grid(s, SEC.vis, 0, VMAX, 2.5, function (v) { return v + " mi"; });
+  grid(s, SEC.vis, 0, VMAX, vrun[1], function (v) { return v + " mi"; });
   if (hasVis) {
     var fogY = yV(1);                          /* under 1 mile is fog by any definition */
     s.push('<rect x="' + PADL + '" y="' + fogY.toFixed(1) + '" width="' + PLOTW + '" height="' +
@@ -998,13 +1022,22 @@ function render() {
     /* a line, not a filled area: visibility sits pinned at the top most of the time */
     s.push('<path d="' + linePath(data.vis.map(function (v) { return v === null ? null : Math.min(v, VMAX); }), yV) +
            '" fill="none" stroke="' + COL.visLine + '" stroke-width="2"' + CP + '/>');
-    var hasAqi = data.aqi && data.aqi.some(function (v) { return v !== null; });
+    /* The AQI overlay rides the visibility row on its own scale, and that scale was a fixed 0-200
+       no matter the air: a typical 60 crawled along the bottom fifth. Same ladder treatment, still
+       pinning anything over 200. */
+    var qmax = 0, hasAqi = false;
+    if (data.aqi) for (i = 0; i < HOURS; i++) {
+      if (data.aqi[i] === null || data.aqi[i] === undefined) continue;
+      hasAqi = true; qmax = Math.max(qmax, Math.min(data.aqi[i], 200));
+    }
+    var QTOP = ladder(qmax, [50, 100, 150, 200], [25, 25, 50, 50])[0];
     if (hasAqi) {   /* smoke and air quality overlay */
-      var yQ = function (v) { return SEC.vis.y + SEC.vis.h * (1 - Math.min(v, 200) / 200); };
+      var yQ = function (v) { return SEC.vis.y + SEC.vis.h * (1 - Math.min(v, QTOP) / QTOP); };
       s.push('<path d="' + linePath(data.aqi, yQ) + '" fill="none" stroke="' + COL.aqi + '" stroke-width="1.6" stroke-dasharray="5 3"' + CP + '/>');
     }
-    var visLeg = [[COL.visLine, "Visibility (miles, 10 = clear)"], [COL.fogBand, "Fog (under 1 mi)"]];
-    if (hasAqi) visLeg.push([COL.aqi, "Air Quality (US AQI, 0-200 scale)", true]);   /* no line, no legend */
+    var visLeg = [[COL.visLine, VMAX === 10 ? "Visibility (miles, 10 = clear)" : "Visibility (miles)"],
+                  [COL.fogBand, "Fog (under 1 mi)"]];
+    if (hasAqi) visLeg.push([COL.aqi, "Air Quality (US AQI, 0-" + QTOP + " scale)", true]);   /* no line, no legend */
     legend(s, SEC.vis, visLeg);
   } else {
     s.push('<text x="' + (PADL + PLOTW / 2) + '" y="' + (SEC.vis.y + SEC.vis.h / 2) +
