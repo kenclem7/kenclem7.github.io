@@ -11,6 +11,8 @@
   base-uri 'none'; object-src 'none'; form-action 'none';">
 <meta name="referrer" content="strict-origin-when-cross-origin">   <!-- share links carry ?lat&lon&name and the page calls out to other hosts;
      browsers already default to this, so this pins the guarantee rather than leaving it to the default -->
+<meta name="color-scheme" content="light dark">   <!-- no stylesheet here: this lets the UA
+     paint a dark canvas so the redirect does not flash white on a dark screen -->
 <meta name="robots" content="noindex, nofollow">
 <title>Weather Chart</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⛵</text></svg>">

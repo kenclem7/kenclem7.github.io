@@ -27,16 +27,57 @@
 <title>Weather Chart</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⛵</text></svg>">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">  <!-- Safari renders no SVG favicons and the home-screen tile needs a real PNG; /favicon.ico ships too -->
-<meta name="theme-color" content="#eef1f4">
+<meta name="theme-color" content="#eef1f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#12171d" media="(prefers-color-scheme: dark)">
 <link rel="preconnect" href="https://api.open-meteo.com" crossorigin>  <!-- the first fetch this page awaits: warm the TLS setup while the HTML parses -->
 <link rel="dns-prefetch" href="https://marine-api.open-meteo.com">
 <link rel="dns-prefetch" href="https://air-quality-api.open-meteo.com">
 <link rel="dns-prefetch" href="https://api.tidesandcurrents.noaa.gov">
 <style>
+  /* ---------- theme tokens ----------
+     Dark mode follows the operating system and nothing else: no toggle, no stored preference,
+     so there is no state to get out of step with the OS and nothing to restore before first
+     paint. Every color on the page goes through one of these names; the chart's own palette
+     is the matching COL_LIGHT / COL_DARK pair in the script (DESIGN.md section 11).
+     Names are roles, not shades: --ink-soft is "the quiet gray text", which is #777 in light
+     and LIGHTER than --ink-mid's dark-mode value would suggest, because on a dark ground the
+     ramp runs the other way. Pick by role and the dark column takes care of itself. */
+  :root {
+    color-scheme: light;
+    --bg: #eef1f4; --surface: #fff; --surface-2: #f8fafc; --surface-bd: #dde2e8;
+    --rule: #e4e9ee; --rule-strong: #d7dde3;
+    --ink: #222; --ink-strong: #111; --ink-mid: #444; --ink-dim: #555; --ink-soft: #777;
+    --ink-meta: #6b7683; --ink-faint: #8a939c; --ink-disabled: #c9d2da;
+    --field-bg: #fff; --field-bd: #c5ccd4;
+    --accent: #1976d2; --accent-strong: #0d5ba1; --accent-tint: #eaf3fc; --accent-wash: #f4f9fe;
+    --on-accent: #fff;
+    --scrim: rgba(20,28,36,.55); --scrim-soft: rgba(15,23,32,.35); --veil: rgba(255,255,255,.55);
+    --tip-bg: rgba(255,255,255,.97); --spin-track: #cfe0f0; --chip-hover: #d9dee4;
+    --shadow-1: rgba(0,0,0,.05); --shadow-2: rgba(0,0,0,.12); --shadow-3: rgba(0,0,0,.3);
+    --err: #c0392b; --hrrr: #e67e22; --hrrr-ink: #b35c00; --crosshair: #f6a04d;
+    --handle-hover: #5b6672;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #12171d; --surface: #1b222a; --surface-2: #222b35; --surface-bd: #2d3843;
+      --rule: #2a333d; --rule-strong: #3a4550;
+      --ink: #e6ebf0; --ink-strong: #f2f6fa; --ink-mid: #c3ccd6; --ink-dim: #aab5c0; --ink-soft: #94a0ac;
+      --ink-meta: #8d99a6; --ink-faint: #78838f; --ink-disabled: #4a555f;
+      --field-bg: #222b35; --field-bd: #3a4550;
+      --accent: #64b0f5; --accent-strong: #9ccdff; --accent-tint: #22303f; --accent-wash: #1d2836;
+      --on-accent: #0f1720;                 /* the blue chip flips to dark ink: white on #64b0f5 fails contrast */
+      --scrim: rgba(4,8,12,.7); --scrim-soft: rgba(4,8,12,.55); --veil: rgba(18,23,29,.62);
+      --tip-bg: rgba(27,34,42,.97); --spin-track: #2c3a49; --chip-hover: #3a4550;
+      --shadow-1: rgba(0,0,0,.35); --shadow-2: rgba(0,0,0,.45); --shadow-3: rgba(0,0,0,.6);
+      --err: #ff7a6b; --hrrr: #f0913e; --hrrr-ink: #f0a95f; --crosshair: #f6a04d;
+      --handle-hover: #94a0ac;
+    }
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif; background: #eef1f4; color: #222; }
+  body { font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif; background: var(--bg); color: var(--ink); }
   .page { margin: 0 auto; padding: 14px 20px 30px; }   /* full browser width, 20px side margins */
-  .card { background: #fff; border: 1px solid #dde2e8; border-radius: 8px; padding: 16px 16px 8px; }
+  .card { background: var(--surface); border: 1px solid var(--surface-bd); border-radius: 8px; padding: 16px 16px 8px; }
 
   /* grid with equal 1fr side columns puts the conditions card on the true page centerline */
   header { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px 18px; align-items: end; margin-bottom: 6px; }
@@ -45,47 +86,61 @@
             transform: translateX(26px); }   /* page center -> chart plot center: (PADL - PADR) / 2 */
   header .toggle { grid-column: 1 / -1; }
   .nowcard .nowlabel { writing-mode: vertical-rl; transform: rotate(180deg); align-self: stretch; text-align: center;
-                       font-size: 13px; font-weight: 600; letter-spacing: 0.8px; color: #111; }
-  .nowcard { display: flex; align-items: center; gap: 12px; border: 1px solid #d7dde3; border-radius: 10px;
-             padding: 8px 16px; background: #f8fafc; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+                       font-size: 13px; font-weight: 600; letter-spacing: 0.8px; color: var(--ink-strong); }
+  .nowcard { display: flex; align-items: center; gap: 12px; border: 1px solid var(--rule-strong); border-radius: 10px;
+             padding: 8px 16px; background: var(--surface-2); box-shadow: 0 1px 3px var(--shadow-1); }
   #nowbox .nicon { font-size: 40px; line-height: 1; }
   #nowbox .ntemp { font-size: 36px; font-weight: 600; }
-  #nowbox .ncond { font-size: 14.5px; color: #444; font-weight: 600; }
-  #nowbox .nsub { font-size: 12.5px; color: #777; margin-top: 2px; }
+  #nowbox .ncond { font-size: 14.5px; color: var(--ink-mid); font-weight: 600; }
+  #nowbox .nsub { font-size: 12.5px; color: var(--ink-soft); margin-top: 2px; }
   h1 { font-size: 22px; font-weight: 600; letter-spacing: .2px; }
-  #locmeta { font-size: 12px; color: #777; margin-top: 3px; }
-  #locmeta button { border: none; background: none; color: #1976d2; cursor: pointer; font-size: 13px; padding: 0 2px; }
+  #locmeta { font-size: 12px; color: var(--ink-soft); margin-top: 3px; }
+  #locmeta button { border: none; background: none; color: var(--accent); cursor: pointer; font-size: 13px; padding: 0 2px; }
 
   .searchwrap { grid-column: 3; justify-self: end; position: relative; width: 345px; max-width: 100%; }
   .searchrow { display: flex; gap: 8px; }
-  #q { flex: 1; min-width: 0; padding: 8px 10px; font-size: 14px; border: 1px solid #c5ccd4; border-radius: 6px; outline: none; }
+  #q { flex: 1; min-width: 0; padding: 8px 10px; font-size: 14px; border: 1px solid var(--field-bd); border-radius: 6px; outline: none;
+       background: var(--field-bg); color: var(--ink); }
   @media (max-width: 600px) { #q { font-size: 16px; } }  /* under 16px iOS Safari zooms the page on focus and leaves it zoomed */
-  #q:focus { border-color: #1976d2; }
-  #q:focus-visible { outline: 2px solid #1976d2; outline-offset: 1px; }
-  .mapbtn { align-self: flex-start; padding: 8px 12px; font-size: 14px; border: 1px solid #c5ccd4; border-radius: 6px;
-            background: #fff; cursor: pointer; white-space: nowrap; }
-  .mapbtn:hover { border-color: #1976d2; color: #1976d2; }
+  #q:focus { border-color: var(--accent); }
+  #q:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .mapbtn { align-self: flex-start; padding: 8px 12px; font-size: 14px; border: 1px solid var(--field-bd); border-radius: 6px;
+            background: var(--field-bg); color: var(--ink); cursor: pointer; white-space: nowrap; }
+  .mapbtn:hover { border-color: var(--accent); color: var(--accent); }
   .mapbtn.gps { width: 34px; height: 34px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
-                flex: 0 0 auto; color: #444; }
-  #mapwrap { position: fixed; inset: 0; z-index: 60; background: rgba(20,28,36,.55); display: none;
+                flex: 0 0 auto; color: var(--ink-mid); }
+  #mapwrap { position: fixed; inset: 0; z-index: 60; background: var(--scrim); display: none;
              align-items: center; justify-content: center; padding: 20px; }
   #mapwrap.on { display: flex; }
-  .mapcard { background: #fff; border-radius: 10px; width: min(900px, 96vw); max-height: 92vh; max-height: min(92vh, 92dvh); display: flex;
-             flex-direction: column; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,.3); }
-  .maphead { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #e4e9ee; }
+  .mapcard { background: var(--surface); border-radius: 10px; width: min(900px, 96vw); max-height: 92vh; max-height: min(92vh, 92dvh); display: flex;
+             flex-direction: column; overflow: hidden; box-shadow: 0 10px 40px var(--shadow-3); }
+  .maphead { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--rule); }
   .maphead h2 { font-size: 16px; font-weight: 600; flex: 1; }
-  .maphead .x { border: none; background: none; font-size: 24px; line-height: 1; cursor: pointer; color: #8a939c; padding: 0 4px; }
+  .maphead .x { border: none; background: none; font-size: 24px; line-height: 1; cursor: pointer; color: var(--ink-faint); padding: 0 4px; }
   #mapbox { flex: 1; min-height: 60vh; min-height: min(60vh, 60dvh); cursor: crosshair; }
-  .mapfoot { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid #e4e9ee; }
-  .mapfoot .sel { flex: 1; font-size: 13.5px; color: #444; }
-  .mapfoot .use { padding: 8px 14px; font-size: 14px; border: 1px solid #1976d2; background: #1976d2; color: #fff;
+  /* OpenStreetMap ships no dark tiles, and adding a dark tile host would mean a new origin in
+     connect-src/img-src plus a second attribution line. Inverting the raster in the browser
+     buys a dark map for one CSS rule and no new third party: hue-rotate puts the blues back
+     after invert flips them orange. Scoped to the tile pane so markers, the zoom control and
+     the attribution stay upright. */
+  @media (prefers-color-scheme: dark) {
+    #mapbox .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.92) contrast(.9); }
+    #mapbox .leaflet-container { background: var(--surface-2); }
+    #mapbox .leaflet-bar a { background: var(--surface-2); color: var(--ink); border-bottom-color: var(--rule-strong); }
+    #mapbox .leaflet-bar a:hover { background: var(--chip-hover); }
+    #mapbox .leaflet-control-attribution { background: rgba(27,34,42,.85); color: var(--ink-meta); }
+    #mapbox .leaflet-control-attribution a { color: var(--accent); }
+  }
+  .mapfoot { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--rule); }
+  .mapfoot .sel { flex: 1; font-size: 13.5px; color: var(--ink-mid); }
+  .mapfoot .use { padding: 8px 14px; font-size: 14px; border: 1px solid var(--accent); background: var(--accent); color: var(--on-accent);
                   border-radius: 6px; cursor: pointer; }
   .mapfoot .use[disabled] { opacity: .4; cursor: default; }
   #pagenav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
   #pagenav a, #pagenav .here { padding: 8px 12px; font-size: 14px; font-weight: 600; line-height: 16px; border-radius: 6px; white-space: nowrap; }
-  #pagenav a { color: #1976d2; text-decoration: none; border: 1px solid #c5ccd4; background: #fff; }
-  #pagenav a:hover { border-color: #1976d2; background: #f4f9fe; }
-  #pagenav .here { color: #fff; background: #1976d2; border: 1px solid #1976d2; cursor: default; }
+  #pagenav a { color: var(--accent); text-decoration: none; border: 1px solid var(--field-bd); background: var(--field-bg); }
+  #pagenav a:hover { border-color: var(--accent); background: var(--accent-wash); }
+  #pagenav .here { color: var(--on-accent); background: var(--accent); border: 1px solid var(--accent); cursor: default; }
   #pagenav .daily { display: none; }          /* phones swap the two forecast buttons for one Daily button */
   @media (max-width: 600px) {                 /* phones: "Daily · Historical", equal-width buttons spanning the page */
     /* NOW card on the true screen center: drop the plot-center shift, stop item min-content
@@ -101,28 +156,29 @@
     #pagenav .daily { display: block; }
     #pagenav a, #pagenav .here { flex: 1 1 0; text-align: center; padding: 8px 4px; }
   }
-  #results { position: absolute; top: 100%; left: 0; right: 0; z-index: 51; background: #fff; border: 1px solid #c5ccd4;
-             border-radius: 0 0 6px 6px; box-shadow: 0 6px 16px rgba(0,0,0,.12); max-height: 240px; overflow-y: auto; }
+  #results { position: absolute; top: 100%; left: 0; right: 0; z-index: 51; background: var(--surface); border: 1px solid var(--field-bd);
+             border-radius: 0 0 6px 6px; box-shadow: 0 6px 16px var(--shadow-2); max-height: 240px; overflow-y: auto; }
   #results div { padding: 8px 10px; font-size: 13px; cursor: pointer; }
-  #results div:hover { background: #eaf3fc; }
-  #results .none { color: #999; cursor: default; }
+  #results div:hover { background: var(--accent-tint); }
+  #results .none { color: var(--ink-faint); cursor: default; }
 
   #recrow { display: flex; gap: 8px; margin-top: 8px; }
   #recwrap { position: relative; flex: 1; min-width: 0; }
   #recbtn { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px;
-            font-size: 14px; line-height: 16px; border: 1px solid #c5ccd4; border-radius: 6px; background: #fff; cursor: pointer; }
-  #recbtn:hover { border-color: #1976d2; }
-  #recbtn .caret { color: #8a939c; font-size: 16px; line-height: 16px; }
-  #recmenu { position: absolute; top: 100%; left: 0; right: 0; z-index: 50; background: #fff; border: 1px solid #c5ccd4;
-             border-radius: 0 0 6px 6px; box-shadow: 0 6px 16px rgba(0,0,0,.12); max-height: 260px; overflow-y: auto; }
+            font-size: 14px; line-height: 16px; border: 1px solid var(--field-bd); border-radius: 6px; background: var(--field-bg);
+            color: var(--ink); cursor: pointer; }
+  #recbtn:hover { border-color: var(--accent); }
+  #recbtn .caret { color: var(--ink-faint); font-size: 16px; line-height: 16px; }
+  #recmenu { position: absolute; top: 100%; left: 0; right: 0; z-index: 50; background: var(--surface); border: 1px solid var(--field-bd);
+             border-radius: 0 0 6px 6px; box-shadow: 0 6px 16px var(--shadow-2); max-height: 260px; overflow-y: auto; }
   #recmenu .row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; font-size: 13.5px; cursor: pointer; }
-  #recmenu .row:hover { background: #eaf3fc; }
-  #recmenu .row.active { color: #0d5ba1; font-weight: 600; background: #f2f8fd; }
+  #recmenu .row:hover { background: var(--accent-tint); }
+  #recmenu .row.active { color: var(--accent-strong); font-weight: 600; background: var(--accent-wash); }
   #recmenu .row b { font-weight: inherit; flex: 1; }
-  #recmenu .row .sub { color: #6b7683; font-size: 12px; }
-  #recmenu .row .rm { color: #6b7683; font-size: 14px; line-height: 1; padding: 1px 4px; border-radius: 8px; }
-  #recmenu .row:focus-visible, #recmenu .row .rm:focus-visible { outline: 2px solid #1976d2; outline-offset: -2px; }
-  #recmenu .row .rm:hover { background: #d9dee4; color: #555; }
+  #recmenu .row .sub { color: var(--ink-meta); font-size: 12px; }
+  #recmenu .row .rm { color: var(--ink-meta); font-size: 14px; line-height: 1; padding: 1px 4px; border-radius: 8px; }
+  #recmenu .row:focus-visible, #recmenu .row .rm:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  #recmenu .row .rm:hover { background: var(--chip-hover); color: var(--ink-dim); }
   /* narrow screens: stack the header (must sit AFTER the base header rules to win the cascade) */
   @media (max-width: 900px) {
     header { grid-template-columns: 1fr; }
@@ -130,71 +186,71 @@
     #nowbox { justify-content: center; }
     .searchwrap { justify-self: stretch; width: 100%; }
   }
-  .toggle { font-size: 12.5px; color: #555; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
-  .toggle .dash { display: inline-block; width: 22px; border-top: 2px dashed #e67e22; }
+  .toggle { font-size: 12.5px; color: var(--ink-dim); display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  .toggle .dash { display: inline-block; width: 22px; border-top: 2px dashed var(--hrrr); }
   /* phones have no hover for the title tooltip: the word HRRR becomes a link opening the explainer card */
   @media (max-width: 600px) {
-    .toggle #hrrrhelp { color: #1976d2; text-decoration: underline; }
+    .toggle #hrrrhelp { color: var(--accent); text-decoration: underline; }
   }
 
-  #status { font-size: 13px; color: #6e6e6e; padding: 8px 2px; min-height: 20px; }
-  #status .err { color: #c0392b; }
+  #status { font-size: 13px; color: var(--ink-soft); padding: 8px 2px; min-height: 20px; }
+  #status .err { color: var(--err); }
   #status button { margin-left: 8px; font-size: 12.5px; cursor: pointer; }
 
   .scroller { overflow-x: auto; }
-  #stickyhead { position: fixed; top: 0; display: none; overflow: hidden; z-index: 40; background: #fff;
-                border-bottom: 1px solid #c9cfd6; box-shadow: 0 3px 8px rgba(0,0,0,.10); }
+  #stickyhead { position: fixed; top: 0; display: none; overflow: hidden; z-index: 40; background: var(--surface);
+                border-bottom: 1px solid var(--rule-strong); box-shadow: 0 3px 8px var(--shadow-2); }
   #stickyhead svg { display: block; }
   .chartbox { position: relative; width: 1080px; }
   .chartbox.loading { min-height: 340px; }
   #loading { position: absolute; inset: 0; z-index: 25; display: none; flex-direction: column; gap: 14px;
-             align-items: center; justify-content: center; background: rgba(255,255,255,.55); }
-  #loading .loadmsg { font-size: 15px; font-weight: 600; color: #444; text-align: center; padding: 0 12px; }
+             align-items: center; justify-content: center; background: var(--veil); }
+  #loading .loadmsg { font-size: 15px; font-weight: 600; color: var(--ink-mid); text-align: center; padding: 0 12px; }
   .chartbox.loading #loading { display: flex; }
-  .spin { width: 52px; height: 52px; border: 5px solid #cfe0f0; border-top-color: #1976d2; border-radius: 50%;
+  .spin { width: 52px; height: 52px; border: 5px solid var(--spin-track); border-top-color: var(--accent); border-radius: 50%;
           animation: bwspin .9s linear infinite; }
   @keyframes bwspin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2.5s; } }
   svg text { font-family: inherit; }
-  #tip { position: absolute; display: none; z-index: 20; background: rgba(255,255,255,.97); border: 1px solid #b9c2cb;
-         border-radius: 8px; box-shadow: 0 3px 10px rgba(0,0,0,.15); padding: 11px 15px; font-size: 19px; line-height: 1.5;
+  #tip { position: absolute; display: none; z-index: 20; background: var(--tip-bg); border: 1px solid var(--rule-strong);
+         border-radius: 8px; box-shadow: 0 3px 10px var(--shadow-2); padding: 11px 15px; font-size: 19px; line-height: 1.5;
          pointer-events: none; white-space: nowrap; }
   #tip .t { font-weight: 600; }
-  #tip .hrrr { color: #b35c00; font-size: 17px; }
-  #tip .tipdiv { border-top: 1px solid #d7dde3; margin: 7px 0 5px; }
+  #tip .hrrr { color: var(--hrrr-ink); font-size: 17px; }
+  #tip .tipdiv { border-top: 1px solid var(--rule-strong); margin: 7px 0 5px; }
   #tip .tl { display: flex; gap: 7px; align-items: baseline; }
   #tip .em { flex: 0 0 26px; text-align: center; }
   /* daily mode (phones): tap-to-read card centered on the screen, drag chip on the crosshair, day pager */
-  #tipback { position: fixed; inset: 0; z-index: 55; background: rgba(15,23,32,.35); display: none; }
+  #tipback { position: fixed; inset: 0; z-index: 55; background: var(--scrim-soft); display: none; }
   #tipback.on { display: block; }
   #tip.cardmode { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 56;
                   pointer-events: auto; white-space: normal; width: min(92vw, 430px); max-height: 82vh; max-height: min(82vh, 82dvh);
                   overflow-y: auto; font-size: 17px; }
-  #dragchip { position: absolute; display: none; z-index: 18; transform: translateX(-50%); background: #fff;
-              border: 1px solid #f6a04d; border-radius: 10px; padding: 2px 9px; font-size: 12.5px; font-weight: 600;
-              color: #333; pointer-events: none; white-space: nowrap; }
+  #dragchip { position: absolute; display: none; z-index: 18; transform: translateX(-50%); background: var(--surface);
+              border: 1px solid var(--crosshair); border-radius: 10px; padding: 2px 9px; font-size: 12.5px; font-weight: 600;
+              color: var(--ink); pointer-events: none; white-space: nowrap; }
   #daypager { display: none; }
   #daypager[hidden] { display: none !important; }
   @media (max-width: 600px) {
     #daypager { position: sticky; top: 0; z-index: 45; display: flex; align-items: stretch; gap: 8px;
-                background: #fff; padding: 6px 0 8px; border-bottom: 1px solid #e4e9ee; }
-    #daypager button { flex: 0 0 56px; min-height: 40px; font-size: 18px; line-height: 1; border: 1px solid #c5ccd4;
-                       border-radius: 6px; background: #fff; color: #1976d2; cursor: pointer; padding: 0; }
-    #daypager button:disabled { color: #c9d2da; border-color: #e2e7ec; }
+                background: var(--surface); padding: 6px 0 8px; border-bottom: 1px solid var(--rule); }
+    #daypager button { flex: 0 0 56px; min-height: 40px; font-size: 18px; line-height: 1; border: 1px solid var(--field-bd);
+                       border-radius: 6px; background: var(--field-bg); color: var(--accent); cursor: pointer; padding: 0; }
+    #daypager button:disabled { color: var(--ink-disabled); border-color: var(--rule); }
     #daypager .dlab { flex: 1 1 auto; display: flex; align-items: center; justify-content: center;
                       font-size: 16px; font-weight: 600; }
     #chart svg { touch-action: pan-y; -webkit-user-select: none; user-select: none; }
     .chartbox { width: auto; }
   }
   #chart .rsz { cursor: ns-resize; touch-action: none; }
-  #chart .rsz:hover line { stroke: #5b6672; }
+  #chart .rsz:hover line { stroke: var(--handle-hover); }
   #chart .drag { cursor: grab; touch-action: none; }
-  #chart .drag:hover circle { fill: #6b7683; }
-  #chart .drag:hover text { fill: #1976d2; }
+  #chart .drag:hover circle { fill: var(--ink-meta); }
+  #chart .drag:hover text { fill: var(--accent); }
   #chart .drag.on { cursor: grabbing; }
-  #chart .drag.on circle, #chart .drag.on text { fill: #1976d2; }
-  .foot { font-size: 11.5px; color: #6b7683; padding: 10px 2px 6px; }
-  .foot a { color: #1976d2; text-decoration: none; }
+  #chart .drag.on circle, #chart .drag.on text { fill: var(--accent); }
+  .foot { font-size: 11.5px; color: var(--ink-meta); padding: 10px 2px 6px; }
+  .foot a { color: var(--accent); text-decoration: none; }
   .foot a:hover { text-decoration: underline; }
 </style>
 </head>
@@ -315,15 +371,54 @@ function applyLayout() {
   SVGH = BOTTOM + 34;
 }
 applyLayout();
-var COL = {
+/* ---------- chart palette ----------
+   The chart is built as an SVG string, so it cannot read the CSS theme tokens: every color it
+   paints comes from here instead, and the two sets have to be kept in step by hand. Two whole
+   tables rather than one plus a patch - reading a row of COL_DARK against the same row of
+   COL_LIGHT is how you check a series kept its identity across the flip, which an override map
+   hides. Dark mode follows the OS and nothing else (DESIGN.md section 11).
+   The second half is ink and furniture: roles that also exist as CSS tokens for the page chrome,
+   duplicated here because the SVG has no access to them. halo is the one worth understanding -
+   it strokes the plot background back in behind text and arrowheads, so it must track --surface. */
+var COL_LIGHT = {
   temp: "#cf3049", feels: "#9b59b6", windLine: "#93c4ec", windArrow: "#14396e", gust: "#b6c3d2",
   cloudFill: "#c9ced4", cloudLine: "#8a939c", probFill: "#8fd0f0", probLine: "#2a92cf",
   accumFill: "#9bd7ea", accumLine: "#3fa7c9", hourlyP: "#1e7d32", hrrr: "#e67e22",
   grid: "#e8eaed", dayline: "#aeb6c0", now: "#444",
   visFill: "#dfe6ec", visLine: "#7f8c99", fogBand: "#f7e2c6", fogLine: "#d98a2b",
-  tideFill: "#bfe3f2", tideLine: "#2b8cb8", curLine: "#7b4fa8",
-  wtempFill: "#9fd4cb", wtempLine: "#1f7a70", aqi: "#a0522d"
+  tideFill: "#bfe3f2", tideLine: "#2b8cb8", curLine: "#7b4fa8", curArrow: "#5a3a80",
+  wtempFill: "#9fd4cb", wtempLine: "#1f7a70", aqi: "#a0522d",
+  ink: "#333", inkHi: "#111", inkAxis: "#1a1a1a", inkCond: "#666", inkLegend: "#555",
+  inkFaint: "#9aa3ac", accent: "#1976d2", sun: "#e07408", halo: "#fff",
+  night: "#c8d6e8", nightOp: "0.55",
+  dots: "#aeb6c0", hatch: "#9aa5b1", zero: "#9fb6c4", crosshair: "#f6a04d", noteSwatch: "#c9ced4",
+  uv: ["#3e8e41", "#c08a12", "#e07408", "#cf3049", "#8f4bab"]
 };
+var COL_DARK = {
+  temp: "#ff6b7d", feels: "#c58ade", windLine: "#7fb0dc", windArrow: "#a8c9ee", gust: "#78869a",
+  cloudFill: "#49535f", cloudLine: "#95a1ad", probFill: "#2c5b78", probLine: "#63b8e8",
+  accumFill: "#275a6b", accumLine: "#5cc6e2", hourlyP: "#5fc271", hrrr: "#f0913e",
+  grid: "#2a333d", dayline: "#4b5660", now: "#c3ccd6",
+  visFill: "#333e49", visLine: "#9aa6b2", fogBand: "#4a3d28", fogLine: "#d9a05a",
+  tideFill: "#22485c", tideLine: "#5cb4dc", curLine: "#b088d8", curArrow: "#c9a6e8",
+  wtempFill: "#25534c", wtempLine: "#54b8ab", aqi: "#d08a5e",
+  ink: "#e6ebf0", inkHi: "#f2f6fa", inkAxis: "#dfe6ee", inkCond: "#a6b1bc", inkLegend: "#aab5c0",
+  inkFaint: "#78838f", accent: "#64b0f5", sun: "#f0a24a", halo: "#1b222a",
+  /* night reads as a DEEPER band here, not a cooler one: on a light plot the dusk-to-dawn wash
+     is the darker thing on the page, and it has to stay the darker thing when the page flips */
+  night: "#060b12", nightOp: "0.5",
+  dots: "#5a646f", hatch: "#6f7a85", zero: "#5b6b78", crosshair: "#f6a04d", noteSwatch: "#5a646f",
+  uv: ["#5fbd63", "#dcae3a", "#f0913e", "#ff6b7d", "#c58ade"]
+};
+var mqDark = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+var COL = mqDark && mqDark.matches ? COL_DARK : COL_LIGHT;
+/* The CSS half of the flip is free - the media query repaints the chrome on its own. The chart
+   has to be rebuilt, because its colors were baked into the SVG string on the last render. No
+   rAF coalescing: this fires when someone changes an OS setting, not while they drag. */
+if (mqDark && mqDark.addEventListener) mqDark.addEventListener("change", function (e) {
+  COL = e.matches ? COL_DARK : COL_LIGHT;
+  render();
+});
 var DEFAULT_LOC = { name: "Kirkland", admin1: "Washington", cc: "US", lat: 47.68, lon: -122.19, elev: 47 };
 var COMPASS = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
 var WD = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
@@ -446,7 +541,7 @@ function aqiWord(v) {
 }
 function uvWord(v) { return v < 3 ? "low" : v < 6 ? "moderate" : v < 8 ? "high" : v < 11 ? "very high" : "extreme"; }
 function sgnFt(v) { var t = v.toFixed(1); if (t === "-0.0") t = "0.0"; return (t.charAt(0) === "-" ? "" : "+") + t; }   /* tide heights always signed; -0.04 is +0.0 */
-function uvColor(v) { return v < 3 ? "#3e8e41" : v < 6 ? "#c08a12" : v < 8 ? "#e07408" : v < 11 ? "#cf3049" : "#8f4bab"; }
+function uvColor(v) { return COL.uv[v < 3 ? 0 : v < 6 ? 1 : v < 8 ? 2 : v < 11 ? 3 : 4]; }
 
 /* WMO weather code + cloud % -> icon and wording for the day strip */
 function dayIcon(codes, clouds, psum) {
@@ -915,9 +1010,9 @@ function render() {
       var dd = data.days[nd];
       if (dd.srF === undefined || (DAILY && nd !== viewDay)) continue;
       s.push('<rect x="' + xb(nd * 24).toFixed(1) + '" y="' + sec.y + '" width="' + (xb(dd.srF) - xb(nd * 24)).toFixed(1) +
-             '" height="' + sec.h + '" fill="#c8d6e8" fill-opacity="0.55"/>');
+             '" height="' + sec.h + '" fill="' + COL.night + '" fill-opacity="' + COL.nightOp + '"/>');
       s.push('<rect x="' + xb(dd.ssF).toFixed(1) + '" y="' + sec.y + '" width="' + (xb((nd + 1) * 24) - xb(dd.ssF)).toFixed(1) +
-             '" height="' + sec.h + '" fill="#c8d6e8" fill-opacity="0.55"/>');
+             '" height="' + sec.h + '" fill="' + COL.night + '" fill-opacity="' + COL.nightOp + '"/>');
     }
   });
 
@@ -928,17 +1023,17 @@ function render() {
     var dy = data.days[d], cx = xb(d * 24) + colw / 2;
     /* one 18px line: spelled out where the column fits it, compact "Sun 8/16" where it does not */
     var dlabel = dy.labelLong && colw >= dy.labelLong.length * 9.7 + 10 ? dy.labelLong : dy.label;
-    s.push('<text x="' + cx + '" y="23" text-anchor="middle" font-size="18" font-weight="600" fill="#333">' + dlabel + "</text>");
+    s.push('<text x="' + cx + '" y="23" text-anchor="middle" font-size="18" font-weight="600" fill="' + COL.ink + '">' + dlabel + "</text>");
     s.push('<text x="' + cx + '" y="48" text-anchor="middle" font-size="14"><tspan fill="' + COL.temp + '" font-weight="600">' +
-           Math.round(dy.hi) + "°</tspan><tspan fill=\"#1a1a1a\"> | " + Math.round(dy.lo) + "°</tspan></text>");
+           Math.round(dy.hi) + "°</tspan><tspan fill=\"" + COL.inkAxis + "\"> | " + Math.round(dy.lo) + "°</tspan></text>");
     s.push('<text x="' + cx + '" y="82" text-anchor="middle" font-size="28">' + dy.icon + "</text>");
-    s.push('<text x="' + cx + '" y="103" text-anchor="middle" font-size="12" fill="#666">' + dy.cond + "</text>");
+    s.push('<text x="' + cx + '" y="103" text-anchor="middle" font-size="12" fill="' + COL.inkCond + '">' + dy.cond + "</text>");
     var wet = dy.psum >= 0.005;
-    s.push('<text x="' + cx + '" y="136" text-anchor="middle" font-size="12" fill="' + (wet ? "#1976d2" : "#1a1a1a") + '">' +
+    s.push('<text x="' + cx + '" y="136" text-anchor="middle" font-size="12" fill="' + (wet ? COL.accent : COL.inkAxis) + '">' +
            (wet ? "💧 " : "") + (wet ? fmtIn(dy.psum) : "0") + " in</text>");
     if (dy.uvx !== null) s.push('<text x="' + cx + '" y="118" text-anchor="middle" font-size="11.5" font-weight="600" fill="' +
                                 uvColor(Math.round(dy.uvx)) + '">UV ' + Math.round(dy.uvx) + "</text>");
-    if (dy.srS) s.push('<text x="' + cx + '" y="153" text-anchor="middle" font-size="11.5" fill="#e07408"><tspan font-weight="700">↑</tspan>' +
+    if (dy.srS) s.push('<text x="' + cx + '" y="153" text-anchor="middle" font-size="11.5" fill="' + COL.sun + '"><tspan font-weight="700">↑</tspan>' +
                        dy.srS + "am  " + '<tspan font-weight="700">↓</tspan>' + dy.ssS + "pm</text>");
   }
 
@@ -972,7 +1067,7 @@ function render() {
     var spd = data.wspd[i], dir = data.wdir[i];
     if (spd === null || dir === null) continue;
     s.push('<g transform="translate(' + x(i).toFixed(1) + "," + yW(spd).toFixed(1) + ") rotate(" + ((dir + 180) % 360) + ')">' +
-           '<path d="M0,-8.3 L5.3,7 L0,3.2 L-5.3,7 Z" fill="' + COL.windArrow + '" stroke="#fff" stroke-width="0.7"/></g>');
+           '<path d="M0,-8.3 L5.3,7 L0,3.2 L-5.3,7 Z" fill="' + COL.windArrow + '" stroke="' + COL.halo + '" stroke-width="0.7"/></g>');
   }
   legend(s, SEC.wind, [[COL.windLine, "Wind Speed (mph) + direction"], [COL.gust, "Gusts (mph)"]].concat(hrrrLegend()));
 
@@ -1044,7 +1139,7 @@ function render() {
     legend(s, SEC.vis, visLeg);
   } else {
     s.push('<text x="' + (PADL + PLOTW / 2) + '" y="' + (SEC.vis.y + SEC.vis.h / 2) +
-           '" text-anchor="middle" font-size="13" fill="#9aa3ac">No visibility data for this location</text>');
+           '" text-anchor="middle" font-size="13" fill="' + COL.inkFaint + '">No visibility data for this location</text>');
     legend(s, SEC.vis, [[COL.visFill, "Visibility (miles)"]]);
   }
 
@@ -1057,12 +1152,12 @@ function render() {
     var yD = function (v) { return SEC.tide.y + SEC.tide.h * (1 - (v - tLo) / (tHi - tLo)); };
     grid(s, SEC.tide, tLo, tHi, (tHi - tLo) / 4, function (v) { return v.toFixed(1); });
     if (tLo < 0) s.push('<line x1="' + PADL + '" y1="' + yD(0).toFixed(1) + '" x2="' + (W - PADR) + '" y2="' +
-                        yD(0).toFixed(1) + '" stroke="#9fb6c4" stroke-width="1" stroke-dasharray="3 3"/>');
+                        yD(0).toFixed(1) + '" stroke="' + COL.zero + '" stroke-width="1" stroke-dasharray="3 3"/>');
     s.push('<path d="' + areaPath(td.h, yD, SEC.tide.y + SEC.tide.h) + '" fill="' + COL.tideFill +
            '" opacity=".8" stroke="' + COL.tideLine + '" stroke-width="1.5"' + CP + '/>');
     /* whose water this is, captioned inside the plot instead of only in the right-edge legend
        (per Ken 2026-08-22): on a wide chart that legend sits a screen away from the TIDE title, so an
-       inland city read Elliott Bay's tides as its own. Black (#111, the row titles' black) rather than
+       inland city read Elliott Bay's tides as its own. COL.inkHi (the row titles' ink) rather than
        legend grey, per Ken 2026-08-22. Phones keep the first comma-part of the station name (same
        convention as map water naming) and drop the "from <city>" tail for width. */
     var stName = DAILY ? td.station.split(",")[0] : td.station;
@@ -1083,8 +1178,8 @@ function render() {
       s.push('<text x="' + ex.toFixed(1) + '" y="' + (ey + (up ? -7 : 15)).toFixed(1) +
              '" text-anchor="middle" font-size="10.5" fill="' + COL.tideLine + '">' + lab + "</text>");
     });
-    s.push('<text x="' + (PADL + 6) + '" y="' + capY + '" font-size="11" fill="#111"' +
-           ' paint-order="stroke" stroke="#fff" stroke-width="3.5" stroke-linejoin="round">' +
+    s.push('<text x="' + (PADL + 6) + '" y="' + capY + '" font-size="11" fill="' + COL.inkHi + '"' +
+           ' paint-order="stroke" stroke="' + COL.halo + '" stroke-width="3.5" stroke-linejoin="round">' +
            esc(capText) + "</text>");
     var tideLegend = [[COL.tideFill, "Tide (ft)"]];
     if (td.cur && td.cur.v) {                  /* current shares the row on its own ± scale */
@@ -1105,12 +1200,12 @@ function render() {
           if (cv2 === null || cv2 === undefined || Math.abs(cv2) < 0.4) continue;
           s.push('<g transform="translate(' + x(ci).toFixed(1) + "," + yCur(cv2).toFixed(1) + ") rotate(" +
                  (cv2 >= 0 ? td.cur.fdir : td.cur.edir) + ')">' +
-                 '<path d="M0,-8.3 L5.3,7 L0,3.2 L-5.3,7 Z" fill="#5a3a80" stroke="#fff" stroke-width="0.7"/></g>');
+                 '<path d="M0,-8.3 L5.3,7 L0,3.2 L-5.3,7 Z" fill="' + COL.curArrow + '" stroke="' + COL.halo + '" stroke-width="0.7"/></g>');
         }
       }
       tideLegend.push([COL.curLine, "Current (kn, +flood / −ebb, max " + cmax.toFixed(1) + ")"]);
     } else if (td.cur && td.cur.note) {
-      tideLegend.push(["#c9ced4", td.cur.station + ": " + td.cur.note.toLowerCase()]);
+      tideLegend.push([COL.noteSwatch, td.cur.station + ": " + td.cur.note.toLowerCase()]);
     }
     legend(s, SEC.tide, tideLegend);
   }
@@ -1134,13 +1229,13 @@ function render() {
   }
 
   /* crosshair (hidden until hover/touch); tops out at the first drawn row wherever reordering put it */
-  s.push('<line id="xh" x1="-10" y1="' + SEC[rows()[0]].y + '" x2="-10" y2="' + BOTTOM + '" stroke="#f6a04d" stroke-width="1.4" opacity="0"/>');
+  s.push('<line id="xh" x1="-10" y1="' + SEC[rows()[0]].y + '" x2="-10" y2="' + BOTTOM + '" stroke="' + COL.crosshair + '" stroke-width="1.4" opacity="0"/>');
   s.push('<rect x="0" y="0" width="' + W + '" height="' + SVGH + '" fill="transparent"/>');
   /* the row being dragged gets tinted so it is obvious which chart is in flight */
   if (dragging && SEC[dragging.key]) {
     var dsec = SEC[dragging.key];
     s.push('<rect x="' + PADL + '" y="' + dsec.y + '" width="' + PLOTW + '" height="' + dsec.h +
-           '" fill="#1976d2" opacity=".06" stroke="#1976d2" stroke-opacity=".4" stroke-width="1.5" stroke-dasharray="6 4"/>');
+           '" fill="' + COL.accent + '" opacity=".06" stroke="' + COL.accent + '" stroke-opacity=".4" stroke-width="1.5" stroke-dasharray="6 4"/>');
   }
   function handleFor(k, sec) {                /* row title + dots; rides the pointer while dragging */
     var held = dragging && dragging.key === k;
@@ -1150,9 +1245,9 @@ function render() {
     var g = ['<g class="drag' + (held ? " on" : "") + '" data-sec="' + k + '" transform="translate(0,' + cy.toFixed(1) + ')">',
              '<title>Drag to reorder this chart</title>',
              '<rect x="2" y="' + (-sec.h / 2) + '" width="28" height="' + sec.h + '" fill="transparent"/>',
-             '<text transform="rotate(-90)" x="0" y="19" text-anchor="middle" font-size="13" font-weight="700" letter-spacing="0.8" fill="#111">' + nm + "</text>"];
+             '<text transform="rotate(-90)" x="0" y="19" text-anchor="middle" font-size="13" font-weight="700" letter-spacing="0.8" fill="' + COL.inkHi + '">' + nm + "</text>"];
     for (r = 0; r < 3; r++) for (c = 0; c < 2; c++) {
-      g.push('<circle cx="' + (11 + c * 7) + '" cy="' + (dy0 + r * 6).toFixed(1) + '" r="1.7" fill="#aeb6c0"/>');
+      g.push('<circle cx="' + (11 + c * 7) + '" cy="' + (dy0 + r * 6).toFixed(1) + '" r="1.7" fill="' + COL.dots + '"/>');
     }
     return g.join("") + "</g>";
   }
@@ -1164,7 +1259,7 @@ function render() {
          '<title>Drag to resize</title><rect x="-16" y="-16" width="20" height="20" fill="transparent"/>'];
     for (gl = 0; gl < 3; gl++) {
       o = 3 + gl * 4;
-      g.push('<line x1="' + (-o) + '" y1="1" x2="1" y2="' + (-o) + '" stroke="#9aa5b1" stroke-width="1.6"/>');
+      g.push('<line x1="' + (-o) + '" y1="1" x2="1" y2="' + (-o) + '" stroke="' + COL.hatch + '" stroke-width="1.6"/>');
     }
     s.push(g.join("") + "</g>");
     if (dragging && dragging.key === k) heldHandle = handleFor(k, sec);   /* drawn last so it floats on top */
@@ -1223,7 +1318,7 @@ function grid(s, sec, lo, hi, step, fmt) {
   for (var v = lo; v <= hi + 1e-9; v += step) {
     var y = sec.y + sec.h * (1 - (v - lo) / (hi - lo));
     s.push('<line x1="' + PADL + '" y1="' + y.toFixed(1) + '" x2="' + (W - PADR) + '" y2="' + y.toFixed(1) + '" stroke="' + COL.grid + '" stroke-width="1"/>');
-    s.push('<text x="' + (PADL - 5) + '" y="' + (y + 3.5).toFixed(1) + '" text-anchor="end" font-size="10" fill="#1a1a1a">' + fmt(v) + "</text>");
+    s.push('<text x="' + (PADL - 5) + '" y="' + (y + 3.5).toFixed(1) + '" text-anchor="end" font-size="10" fill="' + COL.inkAxis + '">' + fmt(v) + "</text>");
   }
 }
 
@@ -1242,7 +1337,7 @@ function legend(s, sec, items) {
     xr = stack ? 2 : xr - txtw;
     if (it[2]) s.push('<line x1="' + xr + '" y1="' + (y - 4) + '" x2="' + (xr + 12) + '" y2="' + (y - 4) + '" stroke="' + it[0] + '" stroke-width="2.2" stroke-dasharray="4 2.5"/>');
     else s.push('<rect x="' + xr + '" y="' + (y - 9) + '" width="12" height="9" fill="' + it[0] + '"/>');
-    s.push('<text x="' + (xr + 16) + '" y="' + y + '" font-size="11" fill="#555">' + esc(it[1]) + "</text>");
+    s.push('<text x="' + (xr + 16) + '" y="' + y + '" font-size="11" fill="' + COL.inkLegend + '">' + esc(it[1]) + "</text>");
     if (stack) y += 13;
     else xr -= 14;
   }

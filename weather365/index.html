@@ -27,52 +27,101 @@
 <title>Average Year · Weather Chart</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🌡️</text></svg>">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">  <!-- Safari renders no SVG favicons and the home-screen tile needs a real PNG; /favicon.ico ships too -->
-<meta name="theme-color" content="#eef1f4">
+<meta name="theme-color" content="#eef1f4" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#12171d" media="(prefers-color-scheme: dark)">
 <link rel="preconnect" href="https://archive-api.open-meteo.com" crossorigin>  <!-- the one fetch this page awaits: warm the TLS setup while the HTML parses -->
 <style>
+  /* ---------- theme tokens ----------
+     Same names and same values as the forecast pages (DESIGN.md section 11) - this page is a
+     separate file, not a shared stylesheet, so the two copies have to be edited together.
+     Dark mode follows the operating system and nothing else: no toggle, no stored preference. */
+  :root {
+    color-scheme: light;
+    --bg: #eef1f4; --surface: #fff; --surface-bd: #dde2e8;
+    --rule: #e4e9ee; --rule-strong: #d7dde3;
+    --ink: #222; --ink-mid: #444; --ink-dim: #555; --ink-soft: #777;
+    --ink-meta: #6b7683; --ink-faint: #8a939c;
+    --field-bg: #fff; --field-bd: #c5ccd4;
+    --accent: #1976d2; --accent-strong: #0d5ba1; --accent-tint: #eaf3fc; --accent-wash: #f4f9fe;
+    --on-accent: #fff;
+    --scrim: rgba(20,28,36,.55); --scrim-soft: rgba(15,23,32,.35); --veil: rgba(255,255,255,.55);
+    --tip-bg: rgba(255,255,255,.97); --spin-track: #cfe0f0; --chip-hover: #d9dee4;
+    --shadow-2: rgba(0,0,0,.12); --shadow-3: rgba(0,0,0,.3);
+    --err: #c0392b; --crosshair: #f6a04d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #12171d; --surface: #1b222a; --surface-bd: #2d3843;
+      --rule: #2a333d; --rule-strong: #3a4550;
+      --ink: #e6ebf0; --ink-mid: #c3ccd6; --ink-dim: #aab5c0; --ink-soft: #94a0ac;
+      --ink-meta: #8d99a6; --ink-faint: #78838f;
+      --field-bg: #222b35; --field-bd: #3a4550;
+      --accent: #64b0f5; --accent-strong: #9ccdff; --accent-tint: #22303f; --accent-wash: #1d2836;
+      --on-accent: #0f1720;                 /* the blue chip flips to dark ink: white on #64b0f5 fails contrast */
+      --scrim: rgba(4,8,12,.7); --scrim-soft: rgba(4,8,12,.55); --veil: rgba(18,23,29,.62);
+      --tip-bg: rgba(27,34,42,.97); --spin-track: #2c3a49; --chip-hover: #3a4550;
+      --shadow-2: rgba(0,0,0,.45); --shadow-3: rgba(0,0,0,.6);
+      --err: #ff7a6b; --crosshair: #f6a04d;
+    }
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif; background: #eef1f4; color: #222; }
+  body { font-family: "Segoe UI", system-ui, -apple-system, Arial, sans-serif; background: var(--bg); color: var(--ink); }
   .page { margin: 0 auto; padding: 14px 20px 30px; }
-  .card { background: #fff; border: 1px solid #dde2e8; border-radius: 8px; padding: 16px 16px 8px; }
+  .card { background: var(--surface); border: 1px solid var(--surface-bd); border-radius: 8px; padding: 16px 16px 8px; }
 
   header { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: flex-end; margin-bottom: 6px; }
   .titleblock { flex: 1 1 340px; min-width: 260px; }
   h1 { font-size: 22px; font-weight: 600; letter-spacing: .2px; }
-  #locmeta { font-size: 12px; color: #777; margin-top: 3px; }
-  #locmeta button { border: none; background: none; color: #1976d2; cursor: pointer; font-size: 13px; padding: 0 2px; }
-  #locmeta a { color: #1976d2; text-decoration: none; }
+  #locmeta { font-size: 12px; color: var(--ink-soft); margin-top: 3px; }
+  #locmeta button { border: none; background: none; color: var(--accent); cursor: pointer; font-size: 13px; padding: 0 2px; }
+  #locmeta a { color: var(--accent); text-decoration: none; }
   #locmeta a:hover { text-decoration: underline; }
 
   .searchwrap { position: relative; flex: 0 1 345px; min-width: 250px; }
   .searchrow { display: flex; gap: 8px; }
-  .mapbtn { padding: 8px 12px; font-size: 14px; border: 1px solid #c5ccd4; border-radius: 6px;
-            background: #fff; cursor: pointer; white-space: nowrap; }
-  .mapbtn:hover { border-color: #1976d2; color: #1976d2; }
+  .mapbtn { padding: 8px 12px; font-size: 14px; border: 1px solid var(--field-bd); border-radius: 6px;
+            background: var(--field-bg); color: var(--ink); cursor: pointer; white-space: nowrap; }
+  .mapbtn:hover { border-color: var(--accent); color: var(--accent); }
   .mapbtn.gps { width: 34px; height: 34px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
-                flex: 0 0 auto; color: #444; }
-  #mapwrap { position: fixed; inset: 0; z-index: 60; background: rgba(20,28,36,.55); display: none;
+                flex: 0 0 auto; color: var(--ink-mid); }
+  #mapwrap { position: fixed; inset: 0; z-index: 60; background: var(--scrim); display: none;
              align-items: center; justify-content: center; padding: 20px; }
   #mapwrap.on { display: flex; }
-  .mapcard { background: #fff; border-radius: 10px; width: min(900px, 96vw); max-height: 92vh; max-height: min(92vh, 92dvh); display: flex;
-             flex-direction: column; overflow: hidden; box-shadow: 0 10px 40px rgba(0,0,0,.3); }
-  .maphead { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid #e4e9ee; }
+  .mapcard { background: var(--surface); border-radius: 10px; width: min(900px, 96vw); max-height: 92vh; max-height: min(92vh, 92dvh); display: flex;
+             flex-direction: column; overflow: hidden; box-shadow: 0 10px 40px var(--shadow-3); }
+  .maphead { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--rule); }
   .maphead h2 { font-size: 16px; font-weight: 600; flex: 1; }
-  .maphead .x { border: none; background: none; font-size: 24px; line-height: 1; cursor: pointer; color: #8a939c; padding: 0 4px; }
+  .maphead .x { border: none; background: none; font-size: 24px; line-height: 1; cursor: pointer; color: var(--ink-faint); padding: 0 4px; }
   #mapbox { flex: 1; min-height: 60vh; min-height: min(60vh, 60dvh); cursor: crosshair; }
-  .mapfoot { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid #e4e9ee; }
-  .mapfoot .sel { flex: 1; font-size: 13.5px; color: #444; }
-  .mapfoot .use { padding: 8px 14px; font-size: 14px; border: 1px solid #1976d2; background: #1976d2; color: #fff;
+  /* OpenStreetMap ships no dark tiles, and adding a dark tile host would mean a new origin in
+     connect-src/img-src plus a second attribution line. Inverting the raster in the browser
+     buys a dark map for one CSS rule and no new third party: hue-rotate puts the blues back
+     after invert flips them orange. Scoped to the tile pane so markers, the zoom control and
+     the attribution stay upright. Keep in step with the same block on the forecast pages. */
+  @media (prefers-color-scheme: dark) {
+    #mapbox .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.92) contrast(.9); }
+    #mapbox .leaflet-container { background: var(--field-bg); }
+    #mapbox .leaflet-bar a { background: var(--field-bg); color: var(--ink); border-bottom-color: var(--rule-strong); }
+    #mapbox .leaflet-bar a:hover { background: var(--chip-hover); }
+    #mapbox .leaflet-control-attribution { background: rgba(27,34,42,.85); color: var(--ink-meta); }
+    #mapbox .leaflet-control-attribution a { color: var(--accent); }
+  }
+  .mapfoot { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--rule); }
+  .mapfoot .sel { flex: 1; font-size: 13.5px; color: var(--ink-mid); }
+  .mapfoot .use { padding: 8px 14px; font-size: 14px; border: 1px solid var(--accent); background: var(--accent); color: var(--on-accent);
                   border-radius: 6px; cursor: pointer; }
   .mapfoot .use[disabled] { opacity: .4; cursor: default; }
-  #q { flex: 1; min-width: 0; padding: 8px 10px; font-size: 14px; border: 1px solid #c5ccd4; border-radius: 6px; outline: none; }
+  #q { flex: 1; min-width: 0; padding: 8px 10px; font-size: 14px; border: 1px solid var(--field-bd); border-radius: 6px; outline: none;
+       background: var(--field-bg); color: var(--ink); }
   @media (max-width: 600px) { #q { font-size: 16px; } }  /* under 16px iOS Safari zooms the page on focus and leaves it zoomed */
-  #q:focus { border-color: #1976d2; }
-  #q:focus-visible { outline: 2px solid #1976d2; outline-offset: 1px; }
+  #q:focus { border-color: var(--accent); }
+  #q:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
   #pagenav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
   #pagenav a, #pagenav .here { padding: 8px 12px; font-size: 14px; font-weight: 600; line-height: 16px; border-radius: 6px; white-space: nowrap; }
-  #pagenav a { color: #1976d2; text-decoration: none; border: 1px solid #c5ccd4; background: #fff; }
-  #pagenav a:hover { border-color: #1976d2; background: #f4f9fe; }
-  #pagenav .here { color: #fff; background: #1976d2; border: 1px solid #1976d2; cursor: default; }
+  #pagenav a { color: var(--accent); text-decoration: none; border: 1px solid var(--field-bd); background: var(--field-bg); }
+  #pagenav a:hover { border-color: var(--accent); background: var(--accent-wash); }
+  #pagenav .here { color: var(--on-accent); background: var(--accent); border: 1px solid var(--accent); cursor: default; }
   #pagenav .daily { display: none; }          /* phones swap the two forecast buttons for one Daily button */
   @media (max-width: 600px) {                 /* phones: "Daily · Historical", equal-width buttons spanning the page */
     #pagenav { width: 100%; }
@@ -80,64 +129,65 @@
     #pagenav .daily { display: block; }
     #pagenav a, #pagenav .here { flex: 1 1 0; text-align: center; padding: 8px 4px; }
   }
-  #results { position: absolute; top: 100%; left: 0; right: 0; z-index: 30; background: #fff; border: 1px solid #c5ccd4;
-             border-radius: 0 0 6px 6px; box-shadow: 0 6px 16px rgba(0,0,0,.12); max-height: 240px; overflow-y: auto; }
+  #results { position: absolute; top: 100%; left: 0; right: 0; z-index: 30; background: var(--surface); border: 1px solid var(--field-bd);
+             border-radius: 0 0 6px 6px; box-shadow: 0 6px 16px var(--shadow-2); max-height: 240px; overflow-y: auto; }
   #results div { padding: 8px 10px; font-size: 13px; cursor: pointer; }
-  #results div:hover { background: #eaf3fc; }
-  #results .none { color: #999; cursor: default; }
+  #results div:hover { background: var(--accent-tint); }
+  #results .none { color: var(--ink-faint); cursor: default; }
 
   #recrow { display: flex; gap: 8px; margin-top: 8px; }
   #recwrap { position: relative; flex: 1; min-width: 0; }
   #recbtn { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px;
-            font-size: 14px; line-height: 16px; border: 1px solid #c5ccd4; border-radius: 6px; background: #fff; cursor: pointer; }
-  #recbtn:hover { border-color: #1976d2; }
-  #recbtn .caret { color: #8a939c; font-size: 16px; line-height: 16px; }
-  #recmenu { position: absolute; top: 100%; left: 0; right: 0; z-index: 29; background: #fff; border: 1px solid #c5ccd4;
-             border-radius: 0 0 6px 6px; box-shadow: 0 6px 16px rgba(0,0,0,.12); max-height: 260px; overflow-y: auto; }
+            font-size: 14px; line-height: 16px; border: 1px solid var(--field-bd); border-radius: 6px; background: var(--field-bg);
+            color: var(--ink); cursor: pointer; }
+  #recbtn:hover { border-color: var(--accent); }
+  #recbtn .caret { color: var(--ink-faint); font-size: 16px; line-height: 16px; }
+  #recmenu { position: absolute; top: 100%; left: 0; right: 0; z-index: 29; background: var(--surface); border: 1px solid var(--field-bd);
+             border-radius: 0 0 6px 6px; box-shadow: 0 6px 16px var(--shadow-2); max-height: 260px; overflow-y: auto; }
   #recmenu .row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; font-size: 13.5px; cursor: pointer; }
-  #recmenu .row:hover { background: #eaf3fc; }
-  #recmenu .row.active { color: #0d5ba1; font-weight: 600; background: #f2f8fd; }
+  #recmenu .row:hover { background: var(--accent-tint); }
+  #recmenu .row.active { color: var(--accent-strong); font-weight: 600; background: var(--accent-wash); }
   #recmenu .row b { font-weight: inherit; flex: 1; }
-  #recmenu .row .sub { color: #6b7683; font-size: 12px; }
-  #recmenu .row .rm { color: #6b7683; font-size: 14px; line-height: 1; padding: 1px 4px; border-radius: 8px; }
-  #recmenu .row:focus-visible, #recmenu .row .rm:focus-visible { outline: 2px solid #1976d2; outline-offset: -2px; }
-  #recmenu .row .rm:hover { background: #d9dee4; color: #555; }
+  #recmenu .row .sub { color: var(--ink-meta); font-size: 12px; }
+  #recmenu .row .rm { color: var(--ink-meta); font-size: 14px; line-height: 1; padding: 1px 4px; border-radius: 8px; }
+  #recmenu .row:focus-visible, #recmenu .row .rm:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  #recmenu .row .rm:hover { background: var(--chip-hover); color: var(--ink-dim); }
 
-  #status { font-size: 13px; color: #6e6e6e; padding: 8px 2px; min-height: 20px; }
-  #status .err { color: #c0392b; }
+  #status { font-size: 13px; color: var(--ink-soft); padding: 8px 2px; min-height: 20px; }
+  #status .err { color: var(--err); }
   #status button { margin-left: 8px; font-size: 12.5px; cursor: pointer; }
 
   .scroller { overflow-x: auto; }
   .chartbox { position: relative; width: 1080px; }
   .chartbox.loading { min-height: 340px; }
   #loading { position: absolute; inset: 0; z-index: 25; display: none; flex-direction: column; gap: 14px;
-             align-items: center; justify-content: center; background: rgba(255,255,255,.55); }
-  #loading .loadmsg { font-size: 15px; font-weight: 600; color: #444; text-align: center; padding: 0 12px; }
+             align-items: center; justify-content: center; background: var(--veil); }
+  #loading .loadmsg { font-size: 15px; font-weight: 600; color: var(--ink-mid); text-align: center; padding: 0 12px; }
   .chartbox.loading #loading { display: flex; }
-  .spin { width: 52px; height: 52px; border: 5px solid #cfe0f0; border-top-color: #1976d2; border-radius: 50%;
+  .spin { width: 52px; height: 52px; border: 5px solid var(--spin-track); border-top-color: var(--accent); border-radius: 50%;
           animation: bwspin .9s linear infinite; }
   @keyframes bwspin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .spin { animation-duration: 2.5s; } }
   svg text { font-family: inherit; }
-  #tip { position: absolute; display: none; z-index: 20; background: rgba(255,255,255,.97); border: 1px solid #b9c2cb;
-         border-radius: 8px; box-shadow: 0 3px 10px rgba(0,0,0,.15); padding: 11px 15px; font-size: 19px; line-height: 1.5;
+  #tip { position: absolute; display: none; z-index: 20; background: var(--tip-bg); border: 1px solid var(--rule-strong);
+         border-radius: 8px; box-shadow: 0 3px 10px var(--shadow-2); padding: 11px 15px; font-size: 19px; line-height: 1.5;
          pointer-events: none; white-space: nowrap; }
   #tip .t { font-weight: 600; }
   /* phones: tap-to-read card centered on the screen + drag chip on the crosshair (same as the forecast pages) */
-  #tipback { position: fixed; inset: 0; z-index: 55; background: rgba(15,23,32,.35); display: none; }
+  #tipback { position: fixed; inset: 0; z-index: 55; background: var(--scrim-soft); display: none; }
   #tipback.on { display: block; }
   #tip.cardmode { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 56;
                   pointer-events: auto; white-space: normal; width: min(92vw, 430px); max-height: 82vh; max-height: min(82vh, 82dvh);
                   overflow-y: auto; font-size: 17px; }
-  #dragchip { position: absolute; display: none; z-index: 18; transform: translateX(-50%); background: #fff;
-              border: 1px solid #f6a04d; border-radius: 10px; padding: 2px 9px; font-size: 12.5px; font-weight: 600;
-              color: #333; pointer-events: none; white-space: nowrap; }
+  #dragchip { position: absolute; display: none; z-index: 18; transform: translateX(-50%); background: var(--surface);
+              border: 1px solid var(--crosshair); border-radius: 10px; padding: 2px 9px; font-size: 12.5px; font-weight: 600;
+              color: var(--ink); pointer-events: none; white-space: nowrap; }
   @media (max-width: 600px) {
     #chart svg { touch-action: pan-y; -webkit-user-select: none; user-select: none; }
     .chartbox { width: auto; }
   }
-  .foot { font-size: 11.5px; color: #6b7683; padding: 10px 2px 6px; }
-  .foot a { color: #1976d2; text-decoration: none; }
+  .foot { font-size: 11.5px; color: var(--ink-meta); padding: 10px 2px 6px; }
+  .foot a { color: var(--accent); text-decoration: none; }
   .foot a:hover { text-decoration: underline; }
 </style>
 </head>
@@ -219,11 +269,31 @@ function applyLayout() {
   SVGH = BOTTOM + 44;
 }
 applyLayout();
-var COL = {
+/* ---------- chart palette ----------
+   The chart is built as an SVG string, so it cannot read the CSS theme tokens: every color it
+   paints comes from here instead. Two whole tables rather than one plus a patch, so a series
+   can be checked row against row across the flip. Same shape as the forecast pages, which carry
+   a longer version of this table - keep the two in step (DESIGN.md section 11). */
+var COL_LIGHT = {
   hi: "#cf3049", lo: "#3f74ad", band: "#f5f7f9", monthline: "#dcdfe3", grid: "#e8eaed",
   range: "#f7e6e9", precipFill: "#9bd7ea", precipLine: "#3fa7c9", mavg: "#22729c",
-  rhi: "#e2a4b0", rlo: "#a5c3e0", rband: "#eef1f6"
+  rhi: "#e2a4b0", rlo: "#a5c3e0", rband: "#eef1f6",
+  recordBand: "#e7ecf3", inkAxis: "#1a1a1a", inkMonth: "#667", inkLegend: "#555", crosshair: "#f6a04d"
 };
+var COL_DARK = {
+  hi: "#ff6b7d", lo: "#7ba9dd", band: "#212a34", monthline: "#38424d", grid: "#2a333d",
+  range: "#3a2830", precipFill: "#275a6b", precipLine: "#5cc6e2", mavg: "#5aa8d4",
+  rhi: "#8a5563", rlo: "#4f6e8c", rband: "#262f3a",
+  recordBand: "#2b3542", inkAxis: "#dfe6ee", inkMonth: "#97a2ae", inkLegend: "#aab5c0", crosshair: "#f6a04d"
+};
+var mqDark = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
+var COL = mqDark && mqDark.matches ? COL_DARK : COL_LIGHT;
+/* The CSS half of the flip is free - the media query repaints the chrome on its own. The chart
+   has to be rebuilt, because its colors were baked into the SVG string on the last render. */
+if (mqDark && mqDark.addEventListener) mqDark.addEventListener("change", function (e) {
+  COL = e.matches ? COL_DARK : COL_LIGHT;
+  render();
+});
 var DEFAULT_LOC = { name: "Kirkland", admin1: "Washington", cc: "US", lat: 47.68, lon: -122.19, elev: 47 };
 
 /* ---------- state ---------- */
@@ -405,7 +475,7 @@ function grid(s, sec, lo, hi, step, fmt) {
   for (var v = lo; v <= hi + 1e-9; v += step) {
     var y = sec.y + sec.h * (1 - (v - lo) / (hi - lo));
     s.push('<line x1="' + PADL + '" y1="' + y.toFixed(1) + '" x2="' + (W - PADR) + '" y2="' + y.toFixed(1) + '" stroke="' + COL.grid + '" stroke-width="1"/>');
-    s.push('<text x="' + (PADL - 5) + '" y="' + (y + 3.5).toFixed(1) + '" text-anchor="end" font-size="10" fill="#1a1a1a">' + fmt(v) + "</text>");
+    s.push('<text x="' + (PADL - 5) + '" y="' + (y + 3.5).toFixed(1) + '" text-anchor="end" font-size="10" fill="' + COL.inkAxis + '">' + fmt(v) + "</text>");
   }
 }
 function linePath(arr, yf) {
@@ -453,7 +523,7 @@ function render() {
     for (m = 0; m < 12; m++) {
       if (m % 2 === 1) s.push('<rect x="' + xb(MSTART[m]).toFixed(1) + '" y="' + sec.y + '" width="' + (MDAYS[m] / DAYS * PLOTW).toFixed(1) + '" height="' + sec.h + '" fill="' + COL.band + '"/>');
       /* phones: single-letter month labels, the full names collide in narrow columns */
-      s.push('<text x="' + ((xb(MSTART[m]) + xb(MSTART[m + 1])) / 2).toFixed(1) + '" y="' + (sec.y + sec.h + 15) + '" text-anchor="middle" font-size="11" fill="#667">' + (PHONE ? MNAMES[m].charAt(0) : MNAMES[m]) + "</text>");
+      s.push('<text x="' + ((xb(MSTART[m]) + xb(MSTART[m + 1])) / 2).toFixed(1) + '" y="' + (sec.y + sec.h + 15) + '" text-anchor="middle" font-size="11" fill="' + COL.inkMonth + '">' + (PHONE ? MNAMES[m].charAt(0) : MNAMES[m]) + "</text>");
     }
     for (m = 0; m <= 12; m++) {
       s.push('<line x1="' + xb(MSTART[m]).toFixed(1) + '" y1="' + sec.y + '" x2="' + xb(MSTART[m]).toFixed(1) + '" y2="' + (sec.y + sec.h) + '" stroke="' + COL.monthline + '" stroke-width="1"/>');
@@ -479,7 +549,7 @@ function render() {
     for (i = DAYS - 1; i >= 0; i--) if (data.rh[i] !== null && data.rl[i] !== null) {
       rd.push("L" + x(i).toFixed(1) + " " + yT(data.rl[i]).toFixed(1));
     }
-    if (ru.length) s.push('<path d="' + ru.join("") + rd.join("") + 'Z" fill="#e7ecf3" fill-opacity="0.7"/>');
+    if (ru.length) s.push('<path d="' + ru.join("") + rd.join("") + 'Z" fill="' + COL.recordBand + '" fill-opacity="0.7"/>');
   }
   /* shaded band between avg high and avg low */
   var up = [], dn = [];
@@ -536,7 +606,7 @@ function render() {
   legend(s, SEC.precip, [[COL.precipFill, "Avg Precipitation (in/day)"], [COL.mavg, "Weekly Average (smoothed)"]]);
 
   /* crosshair + hover capture */
-  s.push('<line id="xh" x1="-10" y1="' + SEC.temp.y + '" x2="-10" y2="' + BOTTOM + '" stroke="#f6a04d" stroke-width="1.4" opacity="0"/>');
+  s.push('<line id="xh" x1="-10" y1="' + SEC.temp.y + '" x2="-10" y2="' + BOTTOM + '" stroke="' + COL.crosshair + '" stroke-width="1.4" opacity="0"/>');
   s.push('<rect x="0" y="0" width="' + W + '" height="' + SVGH + '" fill="transparent"/>');
   s.push("</svg>");
   $("chart").innerHTML = s.join("");
@@ -587,7 +657,7 @@ function legend(s, sec, items) {
     it = items[i]; txtw = it[1].length * 6.1 + 20;
     xr = stack ? 2 : xr - txtw;
     s.push('<rect x="' + xr + '" y="' + (y - 9) + '" width="12" height="9" fill="' + it[0] + '"/>');
-    s.push('<text x="' + (xr + 16) + '" y="' + y + '" font-size="11" fill="#555">' + esc(it[1]) + "</text>");
+    s.push('<text x="' + (xr + 16) + '" y="' + y + '" font-size="11" fill="' + COL.inkLegend + '">' + esc(it[1]) + "</text>");
     if (stack) y += 12.5;
     else xr -= 14;
   }
