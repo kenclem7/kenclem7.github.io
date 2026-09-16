@@ -602,20 +602,32 @@ function api(params) {
   u.set("timezone", "auto"); u.set("temperature_unit", "fahrenheit");
   u.set("wind_speed_unit", "mph"); u.set("precipitation_unit", "inch");
   return fetch("https://api.open-meteo.com/v1/forecast?" + u).then(function (r) {
-    if (!r.ok) {
-      /* Open-Meteo answers a 4xx with an error object in the body carrying a "reason" string.
-         Throwing a bare "HTTP 400" threw that away, and the backbone fallback below has to tell
-         the one 400 that means "this spot is off that model's grid" apart from a 400 we caused
-         ourselves with a malformed request. The reason also reads better in the error banner. */
-      return r.json().catch(function () { return null; }).then(function (j) {
-        var err = new Error("HTTP " + r.status + (j && j.reason ? ": " + j.reason : ""));
-        err.status = r.status;
-        err.reason = (j && j.reason) || "";
-        throw err;
-      });
-    }
-    return r.json();
+    /* Read the body as text and parse it here rather than handing the response to r.json().
+       Open-Meteo answers some failures with HTTP 200 and a body that is not JSON at all, and
+       r.json() turned those into a raw SyntaxError thrown from inside the fetch - carrying no
+       status and no body, so it sailed past every test backboneFallback() makes and an
+       out-of-coverage location showed "Unexpected token 'a'" instead of falling back. Every
+       failure now arrives as an error carrying status, reason and the raw body. */
+    return r.text().then(function (body) {
+      var j = null;
+      try { j = JSON.parse(body); } catch (notJson) { j = null; }
+      if (!r.ok) {
+        /* Open-Meteo answers a 4xx with an error object in the body carrying a "reason" string.
+           Throwing a bare "HTTP 400" threw that away, and the backbone fallback below has to tell
+           the one 400 that means "this spot is off that model's grid" apart from a 400 we caused
+           ourselves with a malformed request. The reason also reads better in the error banner. */
+        throw apiError("HTTP " + r.status + (j && j.reason ? ": " + j.reason : ""),
+                       r.status, (j && j.reason) || "", body);
+      }
+      if (j === null) throw apiError("HTTP 200, body is not JSON: " + body.slice(0, 80), 200, "", body);
+      return j;
+    });
   });
+}
+function apiError(message, status, reason, body) {
+  var e = new Error(message);
+  e.status = status; e.reason = reason; e.body = body || "";
+  return e;
 }
 
 /* The backbone call decides the whole page: build() takes its hourly.time as the time axis and joins
@@ -626,21 +638,61 @@ function api(params) {
    4.8F for ECMWF (9.1F at San Diego, 11.0F at Los Angeles). NBM is CONUS-only, so ECMWF stays on as
    the model for everywhere else rather than being dropped. */
 var BACKBONE_HOURLY = "temperature_2m,apparent_temperature,precipitation,weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m";
+/* Which answers send the backbone to ECMWF, and which footer label the page then wears. Returns
+   "coverage", "unavailable", or "" for an answer that must stay an error in front of the reader.
+
+   "coverage" - this spot is off NBM's grid for good, and ECMWF is the right forecast for it.
+   Open-Meteo has said so two ways. Until 2026-09 it was HTTP 400 carrying the reason "No data is
+   available for this location", which is what London returned. It is now HTTP 200 whose body reads
+   {"latitude":nan,"longitude":nan,...} with no hourly block - and a bare nan is not valid JSON, so
+   it never reached the 400-only test that used to live here: every non-CONUS location showed an
+   error banner instead of a forecast. Both shapes are kept. The 400 may well come back, and testing
+   for the one we no longer see costs nothing. The nan test reads the coordinate keys and not the
+   body at large on purpose: a nan buried in an hourly series is a glitch somewhere NBM does cover,
+   and while that body cannot be parsed either - so ECMWF answers either way - it has to fall
+   through to "unavailable" below and not claim San Diego is off the grid.
+
+   "unavailable" - NBM is inside coverage but having a bad minute: HTTP 200 whose body is not JSON
+   and not the nan shape, seen on 2026-09-16 as "Unexpected error while streaming data:
+   timeoutReached" returned after ~32s while apparent_temperature stalled upstream. ECMWF answers
+   rather than the page dying, and the footer names it, so the coarser grid is never passed off
+   as NBM.
+
+   "" - everything else, deliberately: a 400 we caused with a malformed request, a 429, a 5xx, a
+   network reject. A bare .catch() here would swallow those and silently serve the 15 km-inland
+   ECMWF forecast, which is the exact bug the move to NBM exists to fix, and it would be invisible
+   while it happened. Those rethrow and the page shows the error, reason and all. */
+function backboneFallback(e) {
+  if (!e) return "";
+  if (e.status === 400 && (e.reason || "").indexOf("No data is available") === 0) return "coverage";
+  if (e.status === 200 && /"(?:latitude|longitude)"\s*:\s*nan/.test(e.body || "")) return "coverage";
+  if (e.status === 200 && e.body) return "unavailable";
+  return "";
+}
+/* A 200 that parses but carries no hourly block is no use as the time axis either, and is what we
+   would get if Open-Meteo ever writes those unplaceable coordinates as a valid JSON null. */
+function usableBackbone(j) { return !!(j && j.hourly && j.hourly.time && j.hourly.time.length); }
+var FOOTMODEL = { "": "NOAA NBM model",
+                  coverage: "ECMWF model (outside NBM coverage)",
+                  unavailable: "ECMWF model (NBM unavailable)" };
+
 function backbone() {
-  return api({ models: "ncep_nbm_conus", forecast_days: DAYSN, hourly: BACKBONE_HOURLY })
-    .catch(function (e) {
-      /* Fall back ONLY on the one answer that means out of coverage: HTTP 400 carrying the reason
-         "No data is available for this location" (what London returns). A bare .catch() here would
-         also swallow a request we broke ourselves and silently serve the 15 km-inland ECMWF forecast
-         instead - which is the exact bug this change exists to fix, and it would be invisible while
-         it happened. Anything else rethrows and the page shows the error, reason and all. */
-      if (!(e && e.status === 400 && (e.reason || "").indexOf("No data is available") === 0)) throw e;
-      return api({ models: "ecmwf_ifs025", forecast_days: DAYSN, hourly: BACKBONE_HOURLY })
-        .then(function (j) { j.fellBack = true; return j; });   /* flagged on the payload, not in a
-                                                                   global: a slow reply from a load
-                                                                   we already abandoned must not
-                                                                   relabel the footer of this one */
+  /* Two-argument .then rather than .then().catch(): a rejection from the ECMWF call inside either
+     handler has to propagate, not re-enter the handler and ask for the fallback a second time. */
+  return api({ models: "ncep_nbm_conus", forecast_days: DAYSN, hourly: BACKBONE_HOURLY }).then(
+    function (j) { return usableBackbone(j) ? j : ecmwf("coverage"); },
+    function (e) {
+      var why = backboneFallback(e);
+      if (!why) throw e;
+      return ecmwf(why);
     });
+}
+function ecmwf(why) {
+  return api({ models: "ecmwf_ifs025", forecast_days: DAYSN, hourly: BACKBONE_HOURLY })
+    .then(function (j) { j.fellBack = why; return j; });       /* flagged on the payload, not in a
+                                                                  global: a slow reply from a load
+                                                                  we already abandoned must not
+                                                                  relabel the footer of this one */
 }
 
 function loadForecast() {
@@ -666,7 +718,7 @@ function loadForecast() {
   ]).then(function (res) {
     if (token !== fetchToken) return;
     build(res[0], res[1], res[2], res[3], res[4]);
-    $("footmodel").textContent = res[0].fellBack ? "ECMWF model (outside NBM coverage)" : "NOAA NBM model";
+    $("footmodel").textContent = FOOTMODEL[res[0].fellBack || ""];
     $("status").textContent = "";
     render();
     setLoading(false);

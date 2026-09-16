@@ -9,13 +9,21 @@ rather than restating the logic here. A test that carries its own copy of the ru
 testing the page the moment someone edits the page, which is exactly when it matters; this
 way, changing ladder() in the HTML is what the assertions see.
 
-WHY THE --live HALF EXISTS, and why it is worth running by hand now and then. The backbone
-falls back from NBM to ECMWF on exactly one condition: HTTP 400 whose body reason begins
-"No data is available for this location". That string is Open-Meteo's to change. If they
-reword it, every request outside the NBM grid stops falling back and the page shows an error
-instead - and more quietly, nothing at all tells us. The live check pins the string. It is
-kept out of CI so a bad minute at Open-Meteo cannot redden an unrelated commit, which also
-means nobody is watching it automatically: run it after any Open-Meteo-facing change.
+WHY THE --live HALF EXISTS, and why it is worth running by hand now and then. Whether a
+non-CONUS location gets a forecast at all rests on the page recognising Open-Meteo's way of
+saying "off this model's grid", and that answer is Open-Meteo's to change without telling
+anyone. It already has: this file used to pin the reason string of an HTTP 400, and on
+2026-09-16 out-of-coverage became an HTTP 200 whose body carries bare nan coordinates, which
+is not even valid JSON. The old check would have caught it - the status assertion, not the
+string one - but nothing runs it on a schedule, so what actually caught it was Bordeaux
+showing an error banner.
+
+So the live half now asks the behavioural question rather than pinning a string: it sends a
+real out-of-coverage request and feeds whatever comes back through the page's own
+backboneFallback(), asserting only that the page calls it "coverage". That survives Open-Meteo
+rewording anything, and fails exactly when the page would fail. It stays out of CI so a bad
+minute at Open-Meteo cannot redden an unrelated commit, which also means nobody is watching it
+automatically: run it after any Open-Meteo-facing change.
 """
 
 import json
@@ -162,31 +170,66 @@ def offline():
               all(x["top"] == 200 for x in ax["aqi"] if x["max"] in (260, 999)))
 
     # ---------------------------------------------------------------- fallback predicate
-    # Every one of these is a real response shape observed from Open-Meteo on 2026-08-22.
-    # Exactly one of them may send the backbone to ECMWF; a second would mean a request we
-    # broke ourselves silently serves the 25 km inland forecast this month's work removed.
-    m = re.search(r"if \(!\((e && e\.status === 400 .*?)\)\) throw e;", src)
-    check("fallback predicate still found in the page", m is not None)
-    if m:
-        cases = [
-            (400, "No data is available for this location", True,  "out of coverage"),
-            (400, "Data corrupted at path ''. Cannot initialize MultiDomains from invalid String value ncep_nbm_typo.", False, "typo'd model"),
-            (400, "Data corrupted at path ''. Cannot initialize SurfacePressure... from invalid String value banana_2m.", False, "bad variable"),
-            (400, "Parameter 'latitude' and 'longitude' must have the same number of elements", False, "missing latitude"),
-            (400, "Latitude must be in range of -90 to 90°. Given: 999.0.", False, "lat out of range"),
-            (400, "Forecast days is invalid. Allowed range 0 to 16. Given 16.", False, "forecast_days"),
-            (429, "Too many concurrent requests", False, "rate limit (concurrent)"),
-            (429, "Minutely API request limit exceeded. Please try again in one minute.", False, "rate limit (minutely)"),
-            (500, "", False, "upstream 5xx"),
-            (0,   "", False, "network reject (no status)"),
-        ]
-        js = ("var C=" + json.dumps([[c[0], c[1]] for c in cases]) + ";"
-              "console.log(JSON.stringify(C.map(function(c){var e={status:c[0],reason:c[1]};"
-              "return !!(" + m.group(1) + ");})));")
-        got = node(js)
-        for (status, reason, want, label), fell in zip(cases, got):
-            check("fallback %-28s %s" % (label, "-> ECMWF" if want else "-> rethrow"),
-                  fell == want, "status=%s reason=%r" % (status, reason[:40]))
+    # Every one of these is a real response shape observed from Open-Meteo: the 400s and the 429s
+    # on 2026-08-22, the two HTTP 200 bodies on 2026-09-16. Only the shapes that mean "off NBM's
+    # grid" may come back "coverage", and only a body NBM could not serve may come back
+    # "unavailable"; everything else must come back "" and stay an error in front of the reader,
+    # because a request we broke ourselves quietly serving the 25 km inland forecast is the bug
+    # the move to NBM exists to fix.
+    NAN_BODY = ('{"latitude":nan,"longitude":nan,"generationtime_ms":0.0029,'
+                '"utc_offset_seconds":7200,"timezone":"Europe/Paris","timezone_abbreviation":"GMT+2"}')
+    STALL_BODY = "Unexpected error while streaming data: timeoutReached"
+    fallback_fn = extract(src, "backboneFallback")
+    # status, reason, body, want, label
+    cases = [
+        (400, "No data is available for this location", "", "coverage", "out of coverage (400)"),
+        (200, "", NAN_BODY, "coverage", "out of coverage (nan coords)"),
+        (200, "", STALL_BODY, "unavailable", "upstream stall"),
+        (400, "Data corrupted at path ''. Cannot initialize MultiDomains from invalid String value ncep_nbm_typo.", "", "", "typo'd model"),
+        (400, "Data corrupted at path ''. Cannot initialize SurfacePressure... from invalid String value banana_2m.", "", "", "bad variable"),
+        (400, "Parameter 'latitude' and 'longitude' must have the same number of elements", "", "", "missing latitude"),
+        (400, "Latitude must be in range of -90 to 90°. Given: 999.0.", "", "", "lat out of range"),
+        (400, "Forecast days is invalid. Allowed range 0 to 16. Given 16.", "", "", "forecast_days"),
+        (429, "Too many concurrent requests", "", "", "rate limit (concurrent)"),
+        (429, "Minutely API request limit exceeded. Please try again in one minute.", "", "", "rate limit (minutely)"),
+        (500, "", "", "", "upstream 5xx"),
+        (0,   "", "", "", "network reject (no status)"),
+        # A 200 whose body is valid JSON never reaches here at all: api() only throws on a body it
+        # could not parse, so a 200 with an empty body means the fetch layer gave us nothing.
+        (200, "", "", "", "200 with an empty body"),
+        # A nan buried in the data rather than the coordinates is a glitch somewhere NBM does
+        # cover. It still cannot be parsed, so ECMWF still answers - but as "unavailable", which
+        # is the honest label, and not as "outside NBM coverage", which would be a lie about
+        # San Diego.
+        (200, "", '{"latitude":32.7,"longitude":-117.1,"hourly":{"temperature_2m":[nan,71.2]}}',
+         "unavailable", "nan in the data, not the coords"),
+    ]
+    js = (fallback_fn + ";var C=" + json.dumps([[c[0], c[1], c[2]] for c in cases]) + ";"
+          "console.log(JSON.stringify(C.map(function(c){"
+          "return backboneFallback({status:c[0],reason:c[1],body:c[2]});})));")
+    for (status, reason, body, want, label), why in zip(cases, node(js)):
+        check("fallback %-32s -> %s" % (label, want or "rethrow"),
+              why == want, "got %r for status=%s reason=%r" % (why, status, reason[:40]))
+    check("fallback %-32s -> rethrow" % "no error object at all",
+          node(fallback_fn + ";console.log(JSON.stringify("
+               "[backboneFallback(null), backboneFallback(undefined)]))") == ["", ""])
+
+    # A 200 that parses but has no usable hourly block is out of coverage too - what we would get
+    # if Open-Meteo ever writes those unplaceable coordinates as a valid JSON null. The backbone
+    # owns the time axis, so "parsed fine" is not the same question as "can be built on".
+    usable_fn = extract(src, "usableBackbone")
+    payloads = [
+        ('{"latitude":null,"longitude":null,"timezone":"Europe/Paris"}', False, "no hourly at all"),
+        ('{"hourly":{"time":[]}}', False, "hourly present but empty"),
+        ('{"hourly":{"temperature_2m":[70]}}', False, "hourly with no time axis"),
+        ('{"hourly":{"time":["2026-09-16T00:00"],"temperature_2m":[70]}}', True, "a real answer"),
+    ]
+    got = node(usable_fn + ";var P=" + json.dumps([p[0] for p in payloads]) + ";"
+               "console.log(JSON.stringify(P.map(function(s){"
+               "return usableBackbone(JSON.parse(s));})));")
+    for (payload, want, label), ok in zip(payloads, got):
+        check("usableBackbone %-26s -> %s" % (label, "keep" if want else "fall back"),
+              ok == want, payload[:60])
 
     # ---------------------------------------------------------------- serve.py port precedence
     env = dict(os.environ, PORT="9999")
@@ -217,24 +260,55 @@ def offline():
     check("backbone asks NBM first", 'models: "ncep_nbm_conus"' in src)
     check("ECMWF is still the fallback", 'models: "ecmwf_ifs025"' in src)
     check("footer names the model that answered", 'id="footmodel"' in src)
+    # Falling back for the two reasons must not read the same in the footer: "outside NBM
+    # coverage" is permanent and expected for that spot, "NBM unavailable" is Open-Meteo having a
+    # bad minute and worth a second look. One label for both would hide the difference.
+    fm = re.search(r"var FOOTMODEL = \{[\s\S]*?\};", src)
+    check("FOOTMODEL still found in the page", fm is not None)
+    if fm:
+        labels = node(fm.group(0) + ";console.log(JSON.stringify("
+                      '[FOOTMODEL[""], FOOTMODEL.coverage, FOOTMODEL.unavailable]))')
+        check("footer: NBM answered", labels[0] == "NOAA NBM model", labels[0])
+        check("footer: out of coverage names ECMWF and why",
+              "ECMWF" in labels[1] and "coverage" in labels[1], labels[1])
+        check("footer: NBM unavailable names ECMWF and why",
+              "ECMWF" in labels[2] and "unavailable" in labels[2], labels[2])
+        check("footer: the two fallbacks do not read the same", labels[1] != labels[2])
 
 
 def live():
     def get(url):
+        """-> (status, parsed-or-None, raw body). Open-Meteo answers with HTTP 200 and bodies that
+        are not JSON at all - bare nan coordinates, plain-text upstream errors - so the raw text
+        has to survive the helper: it is what the page's own backboneFallback() reads."""
         try:
             with urllib.request.urlopen(url, timeout=30) as r:
-                return r.status, json.load(r)
+                status, body = r.status, r.read().decode("utf-8", "replace")
         except urllib.error.HTTPError as e:
-            return e.code, json.load(e)
+            status, body = e.code, e.read().decode("utf-8", "replace")
+        try:
+            return status, json.loads(body), body
+        except ValueError:
+            return status, None, body
 
     base = ("https://api.open-meteo.com/v1/forecast?latitude=%s&longitude=%s&timezone=auto"
             "&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch"
             "&forecast_days=10&models=%s&hourly=temperature_2m,apparent_temperature,precipitation,"
             "weather_code,cloud_cover,wind_speed_10m,wind_gusts_10m,wind_direction_10m")
 
-    status, j = get(base % (32.72, -117.16, "ncep_nbm_conus"))
+    # The page's own classifier, run against what Open-Meteo actually says right now. Restating
+    # the rules here would stop testing the page the moment someone edited the page.
+    page = open(PAGE, encoding="utf-8").read()
+    fallback_fn = extract(page, "backboneFallback")
+
+    def classify(status, reason, body):
+        return node(fallback_fn + ";console.log(JSON.stringify(backboneFallback(%s)))"
+                    % json.dumps({"status": status, "reason": reason, "body": body}))
+
+    status, j, body = get(base % (32.72, -117.16, "ncep_nbm_conus"))
     check("live: NBM answers 200 in CONUS", status == 200, str(status))
-    if status == 200:
+    check("live: NBM's CONUS answer is JSON", j is not None, body[:120])
+    if status == 200 and j:
         h = j.get("hourly", {})
         check("live: NBM carries all 8 backbone variables",
               all(k in h for k in ["temperature_2m", "apparent_temperature", "precipitation",
@@ -244,17 +318,23 @@ def live():
               all(len([v for v in h[k] if v is not None]) >= 240 for k in h if k != "time"),
               "shortest series %d h" % min(len([v for v in h[k] if v is not None])
                                            for k in h if k != "time"))
+    elif status == 200:
+        # Seen on 2026-09-16: apparent_temperature stalled upstream and Open-Meteo gave up after
+        # ~32s with a plain-text body. The page now falls back and says so in the footer, which is
+        # what the next check confirms, so this is a bad minute at Open-Meteo and not a regression.
+        check("live: a non-JSON CONUS answer falls back as unavailable",
+              classify(200, "", body) == "unavailable", body[:120])
 
-    # THE important one - see the module docstring
-    status, j = get(base % (51.51, -0.13, "ncep_nbm_conus"))
+    # THE important one - see the module docstring. Not "Open-Meteo still words it this way" but
+    # "the page still recognises whatever Open-Meteo says", which is the thing that can break.
+    status, j, body = get(base % (51.51, -0.13, "ncep_nbm_conus"))
     reason = (j or {}).get("reason", "")
-    check("live: out-of-coverage is still HTTP 400", status == 400, str(status))
-    check('live: reason still begins "No data is available"',
-          reason.startswith("No data is available"),
-          "Open-Meteo now says %r - the fallback predicate must be updated or every "
-          "non-CONUS location breaks" % reason)
+    check("live: the page reads London as outside NBM coverage",
+          classify(status, reason, body) == "coverage",
+          "Open-Meteo now answers HTTP %s reason=%r body=%r - backboneFallback() must learn this "
+          "shape or every non-CONUS location breaks" % (status, reason, body[:120]))
 
-    status, _ = get(base % (51.51, -0.13, "ecmwf_ifs025"))
+    status, _, _ = get(base % (51.51, -0.13, "ecmwf_ifs025"))
     check("live: ECMWF still answers where NBM does not", status == 200, str(status))
 
 
