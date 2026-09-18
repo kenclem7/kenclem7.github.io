@@ -209,10 +209,11 @@ predicate are all extracted from the page and executed. A test carrying its own 
 testing the page the moment someone edits the page, which is exactly when it matters. It covers every
 ladder rung and its boundaries (the top is the *lowest* rung that fits, the top gridline actually draws,
 no label lies about its value - `0.25` must never print as `0.3`, no divisor reaches zero); both
-`Math.min` caps, executed rather than assumed; the fallback predicate against the ten real Open-Meteo
-response shapes catalogued 2026-08-22, of which **exactly one** may divert to ECMWF; `serve.py`'s port
-precedence; and that the inline script still parses. Node is required, and the suite says so plainly
-rather than throwing a traceback if it is missing.
+`Math.min` caps, executed rather than assumed; `backboneFallback()` against the fourteen real Open-Meteo
+response shapes catalogued 2026-08-22 and 2026-09-16, of which **exactly four** may divert to ECMWF - two
+as `"coverage"` and two as `"unavailable"`, and the other ten must stay errors - plus `usableBackbone()`
+against four payloads; `serve.py`'s port precedence; and that the inline script still parses. Node is
+required, and the suite says so plainly rather than throwing a traceback if it is missing.
 
 **The `--live` half exists for one reason worth understanding.** Whether a non-CONUS location gets a
 forecast at all rests on the page recognising Open-Meteo's way of saying "off this model's grid", and
