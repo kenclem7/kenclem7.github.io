@@ -172,10 +172,11 @@ def offline():
     # ---------------------------------------------------------------- fallback predicate
     # Every one of these is a real response shape observed from Open-Meteo: the 400s and the 429s
     # on 2026-08-22, the two HTTP 200 bodies on 2026-09-16. Only the shapes that mean "off NBM's
-    # grid" may come back "coverage", and only a body NBM could not serve may come back
-    # "unavailable"; everything else must come back "" and stay an error in front of the reader,
-    # because a request we broke ourselves quietly serving the 25 km inland forecast is the bug
-    # the move to NBM exists to fix.
+    # grid" may come back "coverage", and only the ones where NBM could not serve the request may
+    # come back "unavailable". What must still come back "" is the short list that matters: a
+    # request we broke ourselves, because quietly serving the 25 km inland forecast instead is the
+    # bug the move to NBM exists to fix; and a 429, which is the one failure where falling back
+    # makes things worse rather than better.
     NAN_BODY = ('{"latitude":nan,"longitude":nan,"generationtime_ms":0.0029,'
                 '"utc_offset_seconds":7200,"timezone":"Europe/Paris","timezone_abbreviation":"GMT+2"}')
     STALL_BODY = "Unexpected error while streaming data: timeoutReached"
@@ -190,10 +191,17 @@ def offline():
         (400, "Parameter 'latitude' and 'longitude' must have the same number of elements", "", "", "missing latitude"),
         (400, "Latitude must be in range of -90 to 90°. Given: 999.0.", "", "", "lat out of range"),
         (400, "Forecast days is invalid. Allowed range 0 to 16. Given 16.", "", "", "forecast_days"),
+        # 429 sits below the 5xx test on purpose and must never be folded into it: the limit is
+        # per origin, so the ECMWF retry rate-limits too and the reader sees the error anyway, one
+        # wasted round trip later and with more pressure on the limit. Ken's call, 2026-09-18.
         (429, "Too many concurrent requests", "", "", "rate limit (concurrent)"),
         (429, "Minutely API request limit exceeded. Please try again in one minute.", "", "", "rate limit (minutely)"),
-        (500, "", "", "", "upstream 5xx"),
-        (0,   "", "", "", "network reject (no status)"),
+        # 5xx and a fetch that never reached anything both mean NBM could not serve this, so ECMWF
+        # answers and the footer says NBM was unavailable. Ken's call, 2026-09-18.
+        (500, "", "", "unavailable", "upstream 5xx"),
+        (502, "", "", "unavailable", "upstream 502"),
+        (503, "", "", "unavailable", "upstream 503"),
+        (0,   "", "", "unavailable", "network reject (status 0)"),
         # A 200 whose body is valid JSON never reaches here at all: api() only throws on a body it
         # could not parse, so a 200 with an empty body means the fetch layer gave us nothing.
         (200, "", "", "", "200 with an empty body"),
@@ -213,6 +221,12 @@ def offline():
     check("fallback %-32s -> rethrow" % "no error object at all",
           node(fallback_fn + ";console.log(JSON.stringify("
                "[backboneFallback(null), backboneFallback(undefined)]))") == ["", ""])
+    # What a real fetch rejection actually looks like: a TypeError with no status property at all,
+    # not the status 0 the table above can express. The table builds its objects by hand, so this
+    # is the one shape it cannot reach and the one the browser will really hand us.
+    check("fallback %-32s -> unavailable" % "fetch TypeError (no status key)",
+          node(fallback_fn + ";var e=new TypeError('Failed to fetch');"
+               "console.log(JSON.stringify(backboneFallback(e)))") == "unavailable")
 
     # A 200 that parses but has no usable hourly block is out of coverage too - what we would get
     # if Open-Meteo ever writes those unplaceable coordinates as a valid JSON null. The backbone

@@ -652,21 +652,32 @@ var BACKBONE_HOURLY = "temperature_2m,apparent_temperature,precipitation,weather
    and while that body cannot be parsed either - so ECMWF answers either way - it has to fall
    through to "unavailable" below and not claim San Diego is off the grid.
 
-   "unavailable" - NBM is inside coverage but having a bad minute: HTTP 200 whose body is not JSON
-   and not the nan shape, seen on 2026-09-16 as "Unexpected error while streaming data:
-   timeoutReached" returned after ~32s while apparent_temperature stalled upstream. ECMWF answers
-   rather than the page dying, and the footer names it, so the coarser grid is never passed off
-   as NBM.
+   "unavailable" - NBM could not serve this request, though the spot is inside its grid. Three ways
+   that happens. An HTTP 200 whose body is not JSON and not the nan shape, seen on 2026-09-16 as
+   "Unexpected error while streaming data: timeoutReached" returned after ~32s while
+   apparent_temperature stalled upstream. A 5xx. And a fetch that rejects with no status at all,
+   which is Open-Meteo unreachable - DNS, offline, CORS, a dropped body stream. In all three ECMWF
+   answers rather than the page dying, and the footer names it, so the coarser grid is never passed
+   off as NBM. The no-status branch is the loose one: it cannot tell "Open-Meteo is down" from "we
+   built a request so broken that fetch refused it". That is an accepted trade (Ken, 2026-09-18) -
+   every URL here is built by URLSearchParams against a fixed base, so a URL malformed enough to
+   reject is close to unreachable, and the self-inflicted mistakes that actually happen (a typo'd
+   model, a bad variable name) come back as 400s and still rethrow loudly.
 
-   "" - everything else, deliberately: a 400 we caused with a malformed request, a 429, a 5xx, a
-   network reject. A bare .catch() here would swallow those and silently serve the 15 km-inland
-   ECMWF forecast, which is the exact bug the move to NBM exists to fix, and it would be invisible
-   while it happened. Those rethrow and the page shows the error, reason and all. */
+   "" - everything else, deliberately. A 400 we caused with a malformed request: a bare .catch()
+   here would swallow it and silently serve the 15 km-inland ECMWF forecast, which is the exact bug
+   the move to NBM exists to fix, and it would be invisible while it happened. And a 429, which
+   falls through the 5xx test on purpose rather than being folded into it - falling back there
+   means firing a second request at an API that just said to slow down, and the limit is per
+   origin, so the ECMWF call rate-limits too and the reader sees the error anyway, one wasted round
+   trip later. Rethrowing is louder and cheaper. Both show the error, reason and all. */
 function backboneFallback(e) {
   if (!e) return "";
   if (e.status === 400 && (e.reason || "").indexOf("No data is available") === 0) return "coverage";
   if (e.status === 200 && /"(?:latitude|longitude)"\s*:\s*nan/.test(e.body || "")) return "coverage";
   if (e.status === 200 && e.body) return "unavailable";
+  if (e.status >= 500) return "unavailable";        /* 429 is below this line on purpose */
+  if (!e.status) return "unavailable";              /* fetch rejected: nothing was reached */
   return "";
 }
 /* A 200 that parses but carries no hourly block is no use as the time axis either, and is what we

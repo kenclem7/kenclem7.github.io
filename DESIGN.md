@@ -55,10 +55,14 @@ NBM's domain is the NBM CONUS grid, which is **not** the same as the United Stat
 | `backboneFallback()` returns | on | footer reads |
 |---|---|---|
 | `"coverage"` | HTTP 400 whose reason begins "No data is available for this location", **or** HTTP 200 whose body carries bare `nan` coordinates, **or** a 200 that parses with no usable `hourly` block (`usableBackbone()`) | ECMWF model (outside NBM coverage) |
-| `"unavailable"` | HTTP 200 whose body is not JSON and is not the `nan` shape - NBM is inside coverage but failed to serve | ECMWF model (NBM unavailable) |
-| `""` - rethrow, no fallback | a 400 we caused with a malformed request, a 429, a 5xx, a network reject | not loaded, and the banner shows the reason |
+| `"unavailable"` | HTTP 200 whose body is not JSON and is not the `nan` shape, **or** a 5xx, **or** a fetch that rejects with no status at all - the spot is inside the grid but NBM could not serve it | ECMWF model (NBM unavailable) |
+| `""` - rethrow, no fallback | a 400 we caused with a malformed request, **or** a 429 | not loaded, and the banner shows the reason |
 
-The two fallbacks are labelled apart on purpose: "outside NBM coverage" is permanent and expected for that spot, "NBM unavailable" means Open-Meteo is having a bad minute and is worth a second look. One label for both would hide the difference. The fallback costs a second round trip, measured at about 180 ms. Note the fallback costs a second round trip, measured at about 180 ms, and only outside the grid.
+The two fallbacks are labelled apart on purpose: "outside NBM coverage" is permanent and expected for that spot, "NBM unavailable" means Open-Meteo is having a bad minute and is worth a second look. One label for both would hide the difference. The fallback costs a second round trip, measured at about 180 ms.
+
+**Why the rethrow row is exactly two entries long** (2026-09-18). A **400 we caused** is the original guard and does not move: swallowing it would silently serve the 15 km-inland forecast, which is the bug the move to NBM exists to fix. A **429** is the more interesting one, and it rethrows for a reason that is not obvious - falling back means firing a second request at an API that just said to slow down, and the limit is per origin, so the ECMWF call rate-limits too and the reader sees the error anyway, one wasted round trip later and with more pressure on the limit. Rethrowing is both louder and cheaper. `tools/mutation-check.py` pins this: folding 429 into the 5xx test is one of the mutations, and the suite must go red for it.
+
+Everything else now falls back, which is a change from the original narrow rule. The reasoning that made it narrow was "a bare `.catch()` would serve the coarser forecast *invisibly*" - and the footer label is what answers that, so once `"unavailable"` existed and named itself, keeping a 5xx or an unreachable Open-Meteo as a dead page bought nothing. **The no-status branch is the loose one:** it cannot tell "Open-Meteo is down" from "we built a request so broken that `fetch` refused it". Accepted trade - every URL here is built by `URLSearchParams` against a fixed base, so a URL malformed enough to reject is close to unreachable, and the self-inflicted mistakes that actually happen (a typo'd model, a bad variable name) come back as 400s and still rethrow loudly. Note the fallback costs a second round trip, measured at about 180 ms, and only outside the grid.
 
 **Open-Meteo changed how "outside the grid" is spelled, and it broke every non-CONUS location (2026-09-16).** For three weeks out-of-coverage meant HTTP 400 with that reason string. It now means **HTTP 200** with a body reading `{"latitude":nan,"longitude":nan,...}` and no `hourly` block - and a bare `nan` is not valid JSON, so `r.json()` threw a `SyntaxError` from inside the fetch, carrying no status and no body for the 400-only test to read. Bordeaux, London and everywhere else off the grid showed *"Could not load the forecast (Unexpected token 'a', ..."atitude":nan,"longit"... is not valid JSON)"* instead of falling back. `models=gfs_hrrr` still answers the old way, so this is specific to `ncep_nbm_conus`; the HRRR overlay was never affected because it is optional and already swallows its own failures.
 
@@ -209,10 +213,11 @@ predicate are all extracted from the page and executed. A test carrying its own 
 testing the page the moment someone edits the page, which is exactly when it matters. It covers every
 ladder rung and its boundaries (the top is the *lowest* rung that fits, the top gridline actually draws,
 no label lies about its value - `0.25` must never print as `0.3`, no divisor reaches zero); both
-`Math.min` caps, executed rather than assumed; `backboneFallback()` against the fourteen real Open-Meteo
-response shapes catalogued 2026-08-22 and 2026-09-16, of which **exactly four** may divert to ECMWF - two
-as `"coverage"` and two as `"unavailable"`, and the other ten must stay errors - plus `usableBackbone()`
-against four payloads; `serve.py`'s port precedence; and that the inline script still parses. Node is
+`Math.min` caps, executed rather than assumed; `backboneFallback()` against the eighteen failure shapes
+catalogued 2026-08-22, 2026-09-16 and 2026-09-18, of which **exactly nine** may divert to ECMWF - two as
+`"coverage"` and seven as `"unavailable"` - and **nine must stay errors**, the 400s we caused and the
+429s; plus `usableBackbone()` against four payloads; `serve.py`'s port precedence; and that the inline
+script still parses. Node is
 required, and the suite says so plainly rather than throwing a traceback if it is missing.
 
 **The `--live` half exists for one reason worth understanding.** Whether a non-CONUS location gets a
@@ -227,11 +232,21 @@ minute at Open-Meteo cannot redden an unrelated commit - and the cost of that ch
 watching it automatically, so run `--live` by hand after any change touching Open-Meteo, and whenever a
 non-CONUS location misbehaves.
 
-The suite was mutation-checked when written: each invariant was confirmed to go red when the matching
-line in the page was broken on purpose. That check earned its keep immediately - the cap assertions
-originally applied the cap in the harness, so they passed on a page that had lost `Math.min(vis, 10)`
-entirely, and only the weather3 copy tripwire noticed. **If you add a case here, break the code once and
-confirm your new assertion is what fails, not something incidental.**
+The suite is mutation-checked: each invariant is confirmed to go red when the matching line in the page
+is broken on purpose. That check earned its keep immediately - the cap assertions originally applied the
+cap in the harness, so they passed on a page that had lost `Math.min(vis, 10)` entirely, and only the
+weather3 copy tripwire noticed. **If you add a case here, break the code once and confirm your new
+assertion is what fails, not something incidental.**
+
+Since 2026-09-18 that is written down as **`py tools/mutation-check.py`**, which breaks eleven lines one
+at a time and asserts the intended check is the one that reddens. It is by hand and **not in CI**, same
+column as `--live`: its needles are exact source lines, so a legitimate edit to one of them fails it with
+"needle not unique" and would redden a good commit. It mutates `weather10/index.html` in place and
+restores it in a `finally`, then asserts the file is byte-identical at the end; if it ever dies hard
+enough to skip that, `git checkout weather10/index.html` and re-run `gen-weather3.py`. **Read a mutation
+that fails to go red as a bug in the mutation first and the assertion second** - two of the original
+seven were wrong that way, one needle written LF against a CRLF working tree (section 4 again) and one
+"widened" regex that happened not to match the fixture either.
 
 ---
 
