@@ -79,6 +79,26 @@
   #locmeta a:hover { text-decoration: underline; }
 
   .searchwrap { position: relative; flex: 0 1 345px; min-width: 250px; }
+  /* Imperial | Metric (DESIGN.md section 12): a row of its own centered over the plot - the forecast
+     pages hang it under the NOW card - and on phones straight under the title, the slot the NOW
+     card fills there, so the switch sits in the same place on every page. The 34px left padding
+     moves the center onto the plot, (PADL - PADR) / 2 = 17px, without the page overflow a
+     transform on a full-width row would cause. */
+  #units { order: 1; flex: 0 0 100%; display: flex; justify-content: center; padding-left: 34px; }
+  @media (max-width: 600px) { #units { order: 0; padding-left: 0; } }
+  /* a 13px all-caps pill (per Ken 2026-09-30). The side in force wears the current-page nav chip's
+     look, accent fill with the ink flipped against it; the other reads as a link, like the nav.
+     ::before stretches the tap target to 29px without growing the pill. Same as the forecast pages. */
+  #units button { position: relative; padding: 0 8px; font: inherit; font-size: 10px; font-weight: 700; line-height: 11px;
+                  letter-spacing: .6px; text-transform: uppercase; color: var(--accent); background: var(--field-bg);
+                  border: 1px solid var(--field-bd); cursor: pointer; }
+  #units button::before { content: ""; position: absolute; inset: -8px 0; }
+  #units button:first-child { border-radius: 3px 0 0 3px; }
+  #units button + button { margin-left: -1px; border-radius: 0 3px 3px 0; }   /* one shared seam */
+  #units button:hover { background: var(--accent-wash); }
+  #units button[aria-pressed="true"] { z-index: 1; color: var(--on-accent); background: var(--accent);
+                                       border-color: var(--accent); cursor: default; }
+  #units button:focus-visible { z-index: 2; outline: 2px solid var(--accent); outline-offset: 1px; }
   .searchrow { display: flex; gap: 8px; }
   .mapbtn { padding: 8px 12px; font-size: 14px; border: 1px solid var(--field-bd); border-radius: 6px;
             background: var(--field-bg); color: var(--ink); cursor: pointer; white-space: nowrap; }
@@ -200,6 +220,7 @@
         <div id="locmeta"></div>
         <div id="pagenav"><a class="daily" href="/weather10/">Daily</a><a href="/weather3/">3 Day<span class="fc"> Forecast</span></a><a href="/weather10/">10 Day<span class="fc"> Forecast</span></a><span class="here">Historical</span></div>
       </div>
+      <div id="units" role="group" aria-label="Units"><button type="button" data-units="imperial">Imperial</button><button type="button" data-units="metric">Metric</button></div>
       <div class="searchwrap">
         <div class="searchrow">
           <input id="q" type="text" placeholder="Add location (city or town)…" autocomplete="off" spellcheck="false">
@@ -294,6 +315,29 @@ if (mqDark && mqDark.addEventListener) mqDark.addEventListener("change", functio
   COL = e.matches ? COL_DARK : COL_LIGHT;
   render();
 });
+/* ---------- units ----------
+   The Imperial | Metric switch, shared with the forecast pages through bw_units (DESIGN.md section
+   12). Same rule as there: the 10-year history is fetched and cached in F and inches - so the
+   bw2norm3 cache stays valid across the flip - and converted only where it is shown. Two whole
+   tables, like the palette. The forecast pages carry a longer version; keep the shared rows in step. */
+function keep(v) { return v; }
+function conv(f) { return function (v) { return v === null || v === undefined ? v : f(v); }; }   /* a missing day stays missing */
+var UNITS_IMPERIAL = {
+  t: keep, tU: "F", tStep: 10, tWide: 55, tPad: 3,      /* gridlines every 10, doubled once the year spans over 55 */
+  p: keep, pU: "in", pFmt: fmtIn, pMonth: function (v) { return fmtIn(v, 1); },
+  pGrid: [0.02, 0.05, 0.1, 0.2, 0.25, 0.5, 1, 2], pFloor: 0.04,   /* precip gridline steps, and the least axis top */
+  hU: "ft", elev: function (m) { return m * 3.28084; }  /* elevation arrives in metres */
+};
+var UNITS_METRIC = {
+  /* half the F steps, and 30 is the 55 F span in C, so the year gets the same gridline density */
+  t: conv(function (f) { return (f - 32) * 5 / 9; }), tU: "C", tStep: 5, tWide: 30, tPad: 5 / 3,
+  p: conv(function (inch) { return inch * 25.4; }), pU: "mm",
+  pFmt: function (inch) { return (inch * 25.4).toFixed(1); }, pMonth: function (inch) { return (inch * 25.4).toFixed(0); },
+  pGrid: [0.5, 1, 2, 2.5, 5, 10, 25, 50], pFloor: 1,
+  hU: "m", elev: keep
+};
+var metric = load("bw_units") === "metric";   /* anything else - unset, or garbage - is the imperial default */
+var U = metric ? UNITS_METRIC : UNITS_IMPERIAL;
 var DEFAULT_LOC = { name: "Kirkland", admin1: "Washington", cc: "US", lat: 47.68, lon: -122.19, elev: 47 };
 
 /* ---------- state ---------- */
@@ -536,10 +580,11 @@ function render() {
     if (hiSrc[i] !== null && hiSrc[i] > tmax) tmax = hiSrc[i];
     if (loSrc[i] !== null && loSrc[i] < tmin) tmin = loSrc[i];
   }
-  var tstep = (tmax - tmin > 55) ? 20 : 10;
-  var tlo = Math.floor((tmin - 3) / tstep) * tstep, thi = Math.ceil((tmax + 3) / tstep) * tstep;
-  var yT = function (v) { return SEC.temp.y + SEC.temp.h * (1 - (v - tlo) / (thi - tlo)); };
-  grid(s, SEC.temp, tlo, thi, tstep, function (v) { return v + " F"; });
+  tmin = U.t(tmin); tmax = U.t(tmax);          /* scanned in F, bracketed in the shown unit */
+  var tstep = (tmax - tmin > U.tWide) ? U.tStep * 2 : U.tStep;
+  var tlo = Math.floor((tmin - U.tPad) / tstep) * tstep, thi = Math.ceil((tmax + U.tPad) / tstep) * tstep;
+  var yT = function (v) { return SEC.temp.y + SEC.temp.h * (1 - (U.t(v) - tlo) / (thi - tlo)); };
+  grid(s, SEC.temp, tlo, thi, tstep, function (v) { return v + " " + U.tU; });
   /* outer band: the highest / lowest reading on each date across the 10 years */
   if (data.rh && data.rl) {
     var ru = [], rd = [];
@@ -564,15 +609,15 @@ function render() {
   s.push('<path d="' + linePath(data.lo, yT) + '" fill="none" stroke="' + COL.lo + '" stroke-width="1.8"/>');
   if (data.rh) s.push('<path d="' + linePath(data.rh, yT) + '" fill="none" stroke="' + COL.rhi + '" stroke-width="1.2"/>');
   if (data.rl) s.push('<path d="' + linePath(data.rl, yT) + '" fill="none" stroke="' + COL.rlo + '" stroke-width="1.2"/>');
-  legend(s, SEC.temp, [[COL.hi, "Average High (°F)"], [COL.lo, "Average Low (°F)"], [COL.rhi, "Highest (10 yrs)"], [COL.rlo, "Lowest (10 yrs)"]]);
+  legend(s, SEC.temp, [[COL.hi, "Average High (°" + U.tU + ")"], [COL.lo, "Average Low (°" + U.tU + ")"], [COL.rhi, "Highest (10 yrs)"], [COL.rlo, "Lowest (10 yrs)"]]);
 
   /* ---- precipitation ---- */
   var pmax = 0;
   for (i = 0; i < DAYS; i++) if (data.p[i] !== null && data.p[i] > pmax) pmax = data.p[i];
-  var psteps = [0.02, 0.05, 0.1, 0.2, 0.25, 0.5, 1, 2], pstep = 2;
-  var ptop = Math.max(pmax * 1.06, 0.04);
+  var psteps = U.pGrid, pstep = psteps[psteps.length - 1];
+  var ptop = Math.max(U.p(pmax) * 1.06, U.pFloor);
   for (i = 0; i < psteps.length; i++) { if (ptop / psteps[i] <= 5.5) { pstep = psteps[i]; break; } }
-  var yP = function (v) { return SEC.precip.y + SEC.precip.h * (1 - v / ptop); };
+  var yP = function (v) { return SEC.precip.y + SEC.precip.h * (1 - U.p(v) / ptop); };
   grid(s, SEC.precip, 0, ptop, pstep, function (v) { return String(Math.round(v * 100) / 100); });
   var pa = [], started = false;
   for (i = 0; i < DAYS; i++) {
@@ -603,7 +648,7 @@ function render() {
     sm.push(wsum ? vsum / wsum : null);
   }
   s.push('<path d="' + linePath(sm, yP) + '" fill="none" stroke="' + COL.mavg + '" stroke-width="2.2"/>');
-  legend(s, SEC.precip, [[COL.precipFill, "Avg Precipitation (in/day)"], [COL.mavg, "Weekly Average (smoothed)"]]);
+  legend(s, SEC.precip, [[COL.precipFill, "Avg Precipitation (" + U.pU + "/day)"], [COL.mavg, "Weekly Average (smoothed)"]]);
 
   /* crosshair + hover capture */
   s.push('<line id="xh" x1="-10" y1="' + SEC.temp.y + '" x2="-10" y2="' + BOTTOM + '" stroke="' + COL.crosshair + '" stroke-width="1.4" opacity="0"/>');
@@ -631,7 +676,7 @@ function render() {
   document.title = locLabel(loc, true) + " · Average Year";
   var latN = Math.abs(loc.lat).toFixed(2) + "°" + (loc.lat >= 0 ? "N" : "S");
   var lonW = Math.abs(loc.lon).toFixed(2) + "°" + (loc.lon >= 0 ? "E" : "W");
-  var elev = loc.elev !== undefined && loc.elev !== null ? " · Elev " + Math.round(loc.elev * 3.28084) + " ft" : "";
+  var elev = loc.elev !== undefined && loc.elev !== null ? " · Elev " + Math.round(U.elev(loc.elev)) + " " + U.hU : "";
   $("locmeta").innerHTML = latN + ", " + lonW + elev +
     ' · <button title="Re-fetch" onclick="loadAverages(true)">refresh</button>';
   renderRecents();
@@ -669,13 +714,13 @@ function legend(s, sec, items) {
 function tipHTML(d) {
   var md = doyToMD(d), mn = MNAMES[md[0]];
   return '<div class="t">' + mn + " " + md[1] + " · avg of " + YEARS_LABEL + "</div>" +
-    "🌡️ high " + (data.hi[d] === null ? "–" : Math.round(data.hi[d]) + "°F") +
-    " · low " + (data.lo[d] === null ? "–" : Math.round(data.lo[d]) + "°F") + "<br>" +
+    "🌡️ high " + (data.hi[d] === null ? "–" : Math.round(U.t(data.hi[d])) + "°" + U.tU) +
+    " · low " + (data.lo[d] === null ? "–" : Math.round(U.t(data.lo[d])) + "°" + U.tU) + "<br>" +
     (data.rh && data.rh[d] !== null && data.rl && data.rl[d] !== null ?
-      "▲ " + Math.round(data.rh[d]) + "° highest" + (data.rhy && data.rhy[d] ? " (" + data.rhy[d] + ")" : "") +
-      " · ▼ " + Math.round(data.rl[d]) + "° lowest" + (data.rly && data.rly[d] ? " (" + data.rly[d] + ")" : "") + "<br>" : "") +
-    "💧 " + (data.p[d] === null ? "–" : fmtIn(data.p[d]) + " in this day") +
-    " · " + mn + " total " + fmtIn(data.mtot[md[0]], 1) + " in";
+      "▲ " + Math.round(U.t(data.rh[d])) + "° highest" + (data.rhy && data.rhy[d] ? " (" + data.rhy[d] + ")" : "") +
+      " · ▼ " + Math.round(U.t(data.rl[d])) + "° lowest" + (data.rly && data.rly[d] ? " (" + data.rly[d] + ")" : "") + "<br>" : "") +
+    "💧 " + (data.p[d] === null ? "–" : U.pFmt(data.p[d]) + " " + U.pU + " this day") +
+    " · " + mn + " total " + U.pMonth(data.mtot[md[0]]) + " " + U.pU;
 }
 
 /* phone reading card: a drag positions the crosshair, a tap opens the card centered
@@ -1036,6 +1081,21 @@ function geocode(q) {
 $("tipback").addEventListener("pointerdown", closeCard);   /* tap anywhere dismisses the reading card */
 $("tip").addEventListener("pointerdown", function () { if (mobTip.card) closeCard(); });
 window.__bw2 = { get data() { return data; }, get loc() { return loc; }, get recents() { return recents; } };
+function renderUnits() {                       /* the side in force is the pressed one */
+  Array.prototype.forEach.call(document.querySelectorAll("#units button"), function (b) {
+    b.setAttribute("aria-pressed", String((b.getAttribute("data-units") === "metric") === metric));
+  });
+}
+renderUnits();
+$("units").addEventListener("click", function (ev) {
+  var b = ev.target.closest ? ev.target.closest("button") : null;
+  if (!b || (b.getAttribute("data-units") === "metric") === metric) return;
+  metric = !metric;
+  U = metric ? UNITS_METRIC : UNITS_IMPERIAL;
+  save("bw_units", metric ? "metric" : "imperial");
+  renderUnits();
+  render();                                    /* a redraw, not a refetch: the cache stays in F and inches */
+});
 placeNav();
 $("yrspan").textContent = YEARS_LABEL;         /* the footer window rides the constants, not hand-edits */
 setTitle(locLabel(loc), ("Average Year (" + YEARS_LABEL + ")").replace(/ /g, "\u00A0"));

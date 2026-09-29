@@ -7,6 +7,6 @@ Personal site. Full details in [DESIGN.md](DESIGN.md).
 - `/weather3/` is the same forecast page limited to today, tomorrow, and the day after
 - `/weather365/` shows a city's average year (10-year daily temperature and precipitation averages, ERA5 via Open-Meteo); `/weather2/` redirects there
 
-Every page has a dark mode that follows the operating system (no toggle - see DESIGN.md section 11).
+Every page has a dark mode that follows the operating system (no toggle - see DESIGN.md section 11), and an Imperial | Metric switch that every page shares (DESIGN.md section 12).
 
 Hosted on GitHub Pages.

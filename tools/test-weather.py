@@ -65,6 +65,27 @@ def extract(src, name):
         i += 1
 
 
+def cut(text, pattern, what):
+    """Cut a regex match out of a page, or stop the suite saying what it could not find."""
+    m = re.search(pattern, text)
+    if not m:
+        sys.exit("could not find %s in the page - the checks below read it from there" % what)
+    return m.group(0)
+
+
+def units_block(text):
+    """The page's whole units block - converters, both tables, and the bw_units read that picks
+    one - from `function keep` through `var U = ...`. Cut as a block rather than line by line, so
+    a mutation of any line inside it is run, not merely missed by a regex."""
+    return cut(text, r"function keep\(v\)[\s\S]*?var U = metric \? UNITS_METRIC : UNITS_IMPERIAL;", "the units block")
+
+
+def unit_tables(text):
+    """The units block, runnable in node: fmtIn beside it, and load() stubbed to an empty store."""
+    return ("var load = function () { return null; };\n" + extract(text, "fmtIn") + "\n"
+            + units_block(text) + "\n")
+
+
 def node(script):
     # The page's JavaScript is the thing under test, so node is a hard requirement rather than a
     # nicety. GitHub's ubuntu-latest ships it; say so plainly if some other runner does not.
@@ -80,36 +101,46 @@ def node(script):
 def offline():
     src = open(PAGE, encoding="utf-8").read()
 
+    # The Imperial | Metric tables, cut out of the page and run as they are. The page fetches in
+    # imperial and converts only where it shows a value, so these two tables are the whole of the
+    # unit logic - and the precip ladder lives in them, so the ladder checks run over both.
+    units = unit_tables(src)
+
     # ---------------------------------------------------------------- axis ladders
     # grid() is the page's own gridline loop; running the real one is the only honest way to
     # assert that the top line actually draws, since that depends on its <= hi + 1e-9 tolerance.
-    helpers = extract(src, "niceTop") + "\n" + extract(src, "ladder")
+    helpers = extract(src, "niceTop") + "\n" + extract(src, "ladder") + "\n" + units
     harness = helpers + r"""
     function lines(lo, hi, step) { var o = []; for (var v = lo; v <= hi + 1e-9; v += step) o.push(v); return o; }
-    var PRECIP = [[0.1,0.25,0.5,1,2,3,5,10],[0.02,0.05,0.1,0.25,0.5,0.5,1,2.5]];
     var VIS    = [[2.5,5,10],[0.5,1,2.5]];
     var AQI    = [[50,100,150,200],[25,25,50,50]];
-    var out = { precip: [], vis: [], aqi: [] };
-    function run(key, rungs, steps, maxes, cap) {
+    var out = { rungs: { "precip": UNITS_IMPERIAL.pRungs, "precip (metric)": UNITS_METRIC.pRungs } };
+    /* u is the unit table of a precip run: past its top rung the page hands over to niceTop, and
+       its labels print at u.pDec - both exactly as render() does it */
+    function run(key, rungs, steps, maxes, cap, u) {
+      out[key] = [];
       maxes.forEach(function (m) {
         var mm = cap === null ? m : Math.min(m, cap);
-        var r = (key === "precip" && mm > 10) ? [niceTop(mm), niceTop(mm) / 4] : ladder(mm, rungs, steps);
-        var top = r[0], step = r[1], g = lines(0, top, step);
-        var dec = key === "precip" ? (Math.round(step * 100) % 10 === 0 ? 1 : 2) : null;
+        var r = (u && mm > rungs[rungs.length - 1]) ? [niceTop(mm), niceTop(mm) / 4] : ladder(mm, rungs, steps);
+        var top = r[0], step = r[1], g = lines(0, top, step), dec = u ? u.pDec(step) : null;
         out[key].push({ max: m, capped: mm, top: top, step: step, n: g.length,
           last: g[g.length - 1],
           labels: dec === null ? g.map(function (v) { return String(v); })
                                : g.map(function (v) { return v.toFixed(dec); }) });
       });
     }
-    run("precip", PRECIP[0], PRECIP[1], [0,0.004,0.09,0.1,0.101,0.17,0.25,0.26,0.3,0.5,0.51,0.9,1,1.01,1.6,2,2.076,2.9,3,3.1,4.2,5,5.1,9.9,10,10.5,14.3,47], null);
-    run("vis",    VIS[0],    VIS[1],    [0,0.4,1,2.4,2.5,2.6,4.9,5,5.1,6,9.9,10,30,67.3], 10);
-    run("aqi",    AQI[0],    AQI[1],    [0,12,48,50,51,63,80,100,101,120,150,151,175,200,260,999], 200);
+    run("precip", UNITS_IMPERIAL.pRungs, UNITS_IMPERIAL.pSteps,
+        [0,0.004,0.09,0.1,0.101,0.17,0.25,0.26,0.3,0.5,0.51,0.9,1,1.01,1.6,2,2.076,2.9,3,3.1,4.2,5,5.1,9.9,10,10.5,14.3,47], null, UNITS_IMPERIAL);
+    run("precip (metric)", UNITS_METRIC.pRungs, UNITS_METRIC.pSteps,
+        [0,0.1,2.3,2.5,2.6,4.9,5,5.1,9.9,10,10.1,24,25,26,49,50,52.8,74,75,76,124,125,126,249,250,251,363,1194], null, UNITS_METRIC);
+    run("vis",    VIS[0],    VIS[1],    [0,0.4,1,2.4,2.5,2.6,4.9,5,5.1,6,9.9,10,30,67.3], 10, null);
+    run("aqi",    AQI[0],    AQI[1],    [0,12,48,50,51,63,80,100,101,120,150,151,175,200,260,999], 200, null);
     console.log(JSON.stringify(out));
     """
     ax = node(harness)
 
-    for key, rungs, cap in (("precip", [0.1, 0.25, 0.5, 1, 2, 3, 5, 10], None),
+    for key, rungs, cap in (("precip", ax["rungs"]["precip"], None),
+                            ("precip (metric)", ax["rungs"]["precip (metric)"], None),
                             ("vis", [2.5, 5, 10], 10),
                             ("aqi", [50, 100, 150, 200], 200)):
         bad_top = [r for r in ax[key] if r["top"] < r["capped"] - 1e-9]
@@ -135,32 +166,44 @@ def offline():
         check("%s: gridline count stays legible (3-9)" % key, not sane, str(sane[:2]))
 
     # the 0.25 -> "0.3" bug, nailed shut: every label must read back as its exact gridline value
-    lied = []
-    for r in ax["precip"]:
-        for i, lab in enumerate(r["labels"]):
-            if abs(float(lab) - i * r["step"]) > 1e-9:
-                lied.append((r["top"], lab))
-    check("precip: every label equals its gridline value", not lied, str(lied[:3]))
+    for key in ("precip", "precip (metric)"):
+        lied = [(r["top"], lab) for r in ax[key] for i, lab in enumerate(r["labels"])
+                if abs(float(lab) - i * r["step"]) > 1e-9]
+        check("%s: every label equals its gridline value" % key, not lied, str(lied[:3]))
+    # 75 mm does the 3 in rung's job: a real Miami week, 2.08 in = 52.8 mm, fills most of the row
+    check("precip (metric): the 52.8 mm Miami week lands on 75, not 125",
+          [x for x in ax["precip (metric)"] if x["max"] == 52.8][0]["top"] == 75)
 
     # The tide axis is no ladder - it brackets the data and cuts the span into four equal steps -
     # but the same lie was open to it: a 3 ft span steps 0.75, and at one fixed decimal its -0.25
-    # gridline printed "-0.3". Sweep spans of every width mod 4, either side of the zero line.
-    spans = [(lo, round(lo + w, 2)) for lo in (-3.3, -1.2, -0.5, 0, 0.3, 1.1)
-             for w in (0.05, 0.3, 0.9, 1.7, 2.0, 2.6, 3.4, 5.5, 8.2, 11.9, 15.3, 22.7)]
-    tx = node(extract(src, "tideAxis") + ";var S=" + json.dumps(spans) + ";"
-              "console.log(JSON.stringify(S.map(function (p) {"
-              "  var t = tideAxis(p[0], p[1]), g = [];"
-              "  for (var v = t[0]; v <= t[1] + 1e-9; v += t[2]) g.push([v, t[3](v)]);"
-              "  return { lo: p[0], hi: p[1], bottom: t[0], top: t[1], g: g }; })));")
-    lied = [(t["lo"], t["hi"], lab) for t in tx for v, lab in t["g"] if abs(float(lab) - v) > 1e-9]
-    check("tide: every label equals its gridline value", not lied, str(lied[:3]))
-    check("tide: the -0.25 gridline reads -0.25, not -0.3",
-          "-0.25" in [lab for t in tx if (t["lo"], t["hi"]) == (-0.5, 1.5) for _, lab in t["g"]])
-    wrong = [(t["lo"], t["hi"]) for t in tx if not (t["bottom"] <= t["lo"] and t["top"] >= t["hi"])]
-    check("tide: axis brackets the data", not wrong, str(wrong[:3]))
-    wrong = [(t["lo"], t["hi"], len(t["g"])) for t in tx
-             if len(t["g"]) != 5 or abs(t["g"][-1][0] - t["top"]) > 1e-9]
-    check("tide: five gridlines, the top one drawn", not wrong, str(wrong[:3]))
+    # gridline printed "-0.3". Sweep spans of every width mod 4, either side of the zero line, in
+    # feet and in metres (the metric axis rounds out to 0.4 m, so every quarter prints at one
+    # decimal - and its float noise must never print a zero line as "-0.0").
+    def tide_sweep(table, spans):
+        return node(extract(src, "tideAxis") + "\n" + units + ";var U=" + table + ", S=" + json.dumps(spans) + ";"
+                    "console.log(JSON.stringify(S.map(function (p) {"
+                    "  var t = tideAxis(p[0], p[1], U.tidePad, U.tideGrain), g = [];"
+                    "  for (var v = t[0]; v <= t[1] + 1e-9; v += t[2]) g.push([v, t[3](v)]);"
+                    "  return { lo: p[0], hi: p[1], bottom: t[0], top: t[1], g: g }; })));")
+    feet = [(lo, round(lo + w, 2)) for lo in (-3.3, -1.2, -0.5, 0, 0.3, 1.1)
+            for w in (0.05, 0.3, 0.9, 1.7, 2.0, 2.6, 3.4, 5.5, 8.2, 11.9, 15.3, 22.7)]
+    metres = [(lo, round(lo + w, 3)) for lo in (-1.0, -0.37, -0.15, 0, 0.09, 0.34)
+              for w in (0.015, 0.09, 0.27, 0.52, 0.61, 0.79, 1.04, 1.68, 2.5, 3.63, 4.66, 6.92)]
+    for name, tx in (("tide", tide_sweep("UNITS_IMPERIAL", feet)),
+                     ("tide (metric)", tide_sweep("UNITS_METRIC", metres))):
+        lied = [(t["lo"], t["hi"], lab) for t in tx for v, lab in t["g"] if abs(float(lab) - v) > 1e-9]
+        check("%s: every label equals its gridline value" % name, not lied, str(lied[:3]))
+        wrong = [(t["lo"], t["hi"]) for t in tx if not (t["bottom"] <= t["lo"] and t["top"] >= t["hi"])]
+        check("%s: axis brackets the data" % name, not wrong, str(wrong[:3]))
+        wrong = [(t["lo"], t["hi"], len(t["g"])) for t in tx
+                 if len(t["g"]) != 5 or abs(t["g"][-1][0] - t["top"]) > 1e-9]
+        check("%s: five gridlines, the top one drawn" % name, not wrong, str(wrong[:3]))
+        if name == "tide":
+            check("tide: the -0.25 gridline reads -0.25, not -0.3",
+                  "-0.25" in [lab for t in tx if (t["lo"], t["hi"]) == (-0.5, 1.5) for _, lab in t["g"]])
+        else:
+            odd = [lab for t in tx for _, lab in t["g"] if not re.match(r"^-?\d+\.\d$", lab) or lab == "-0.0"]
+            check("tide (metric): one decimal on every label, and never -0.0", not odd, str(odd[:3]))
 
     # The caps are load-bearing twice over: they bound the drawn line AND they bound the max that
     # feeds the ladder, so losing one would ladder the axis to a nonsense top. The sweep above
@@ -174,7 +217,7 @@ def offline():
     check("aqi max-scan found in the page", aqi_block is not None)
     if vis_block and aqi_block:
         r = node(
-            "var HOURS=4, i;"
+            units + "var HOURS=4, i, U=UNITS_IMPERIAL;"
             "var data={vis:[2.0,67.3,9.0,null], aqi:[40,260,55,null]};"
             + vis_block.group(1) + "\n" + aqi_block.group(1) + "\n"
             "console.log(JSON.stringify({vmax:vmax, hasVis:hasVis, qmax:qmax, hasAqi:hasAqi}));")
@@ -186,8 +229,51 @@ def offline():
         # and the capped max must still land on the top rung
         check("capped 67.3 mi lands on the 10 mi rung",
               [x for x in ax["vis"] if x["max"] == 67.3][0]["top"] == 10)
+        # Metric caps at 10 km, and has to convert BEFORE it caps: 7 mi is 11.3 km, so it must read
+        # 10 - capping first would let 11.3 through, and forgetting to convert would read 7.
+        rm = node(units + "var HOURS=3, i, U=UNITS_METRIC; var data={vis:[2.0,7.0,null]};"
+                  + vis_block.group(1) + "\nconsole.log(JSON.stringify(vmax));")
+        check("metric: the scan converts to km, then caps at 10", rm == 10, "vmax=%s" % rm)
         check("capped AQI 260/999 land on the 200 rung",
               all(x["top"] == 200 for x in ax["aqi"] if x["max"] in (260, 999)))
+
+    # ---------------------------------------------------------------- units
+    u = node(units + r"""
+    var I = UNITS_IMPERIAL, M = UNITS_METRIC;
+    console.log(JSON.stringify({ keysI: Object.keys(I).sort(), keysM: Object.keys(M).sort(),
+      t: [M.t(32), M.t(212), M.t(-40)], conv: [M.s(10), M.p(1), M.d(1), M.h(1)],
+      missing: [M.t(null), M.s(null), M.p(null), M.d(null), M.h(null)], undef: M.t(undefined) === undefined,
+      same: [I.t(71.2), I.s(12.9), I.p(0.14), I.d(9.4), I.h(-1.5)], elev: [I.elev(100), M.elev(100)] }));""")
+    # two whole tables, like the palette: an entry missing from one prints "undefined" on the page
+    check("units: both tables carry the same entries", u["keysI"] == u["keysM"],
+          str(sorted(set(u["keysI"]) ^ set(u["keysM"]))))
+    check("units: F -> C at 32, 212 and -40",
+          all(abs(a - b) < 1e-9 for a, b in zip(u["t"], [0, 100, -40])), str(u["t"]))
+    check("units: mph -> km/h, in -> mm, mi -> km, ft -> m",
+          all(abs(a - b) < 1e-9 for a, b in zip(u["conv"], [16.09344, 25.4, 1.609344, 0.3048])), str(u["conv"]))
+    check("units: a missing hour stays missing, not -17.8", u["missing"] == [None] * 5 and u["undef"])
+    check("units: imperial passes readings through untouched", u["same"] == [71.2, 12.9, 0.14, 9.4, -1.5])
+    check("units: elevation arrives in metres",
+          abs(u["elev"][0] - 328.084) < 1e-9 and u["elev"][1] == 100, str(u["elev"]))
+    # bw_units is shared by three pages and read before anything is drawn: only the exact stored
+    # string means metric, and anything else - absent, garbage, a different case - is the default
+    stored = ["metric", "Metric", "imperial", None, 1, True, {}, ["metric"]]
+    got = node(extract(src, "fmtIn") + ";var BLOCK=" + json.dumps(units_block(src)) + ", S=" + json.dumps(stored) + ";"
+               "console.log(JSON.stringify(S.map(function (s) {"
+               "  var load = function () { return s; }; eval(BLOCK); return U === UNITS_METRIC; })));")
+    check('units: only a stored "metric" means metric; anything else is imperial',
+          got == [True] + [False] * (len(stored) - 1), str(got))
+    # weather365 carries its own copy of the tables (one file per page, DESIGN.md section 11), so
+    # hold that copy to the same factors and the same both-tables-line-up rule
+    src365 = open(os.path.join(ROOT, "weather365", "index.html"), encoding="utf-8").read()
+    h = node(unit_tables(src365) + ";var I = UNITS_IMPERIAL, M = UNITS_METRIC;"
+             "console.log(JSON.stringify({ keysI: Object.keys(I).sort(), keysM: Object.keys(M).sort(),"
+             " conv: [M.t(212), M.p(1), M.elev(100), I.elev(100)], missing: M.t(null) }));")
+    check("weather365: both unit tables carry the same entries", h["keysI"] == h["keysM"],
+          str(sorted(set(h["keysI"]) ^ set(h["keysM"]))))
+    check("weather365: converts like the forecast pages",
+          all(abs(a - b) < 1e-9 for a, b in zip(h["conv"], [100, 25.4, 100, 328.084])) and h["missing"] is None,
+          str(h["conv"]))
 
     # ---------------------------------------------------------------- fallback predicate
     # Every one of these is a real response shape observed from Open-Meteo: the 400s and the 429s

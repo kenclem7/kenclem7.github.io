@@ -104,6 +104,8 @@ Everything else (DAYSN = HOURS/24) derives at runtime. The two pages share all l
 
 **Header row:** CSS grid `1fr auto 1fr` centers the current-conditions card, then translateX(26px) = (PADL-PADR)/2 shifts it onto the CHART PLOT center (middle column on 3 Day, the column 5/6 seam on 10 Day) (title left, search right; under 900px it stacks to one column). **On phones (under 600px) the NOW card sits on the true screen center** (2026-08-18): the shift is dropped (`transform: none`), `header > * { min-width: 0 }` stops item min-content widths (the NOW card's, the HRRR toggle label's) from growing the shared one-column grid track (which used to hang all the overflow off the right edge), and the card slims down (padding 8/10, gap 9, icon 34px, temp 31px) to fit a phone column; anything still wider spills symmetrically, staying centered. The 600-900px stacked band keeps the plot-center shift and full-size card. Columns are bottom-aligned (`align-items: end`): the page nav, the conditions card, and the recents pull-down share one bottom line. Page nav renders as buttons (14px/600, line-height 16px so they stand exactly 34px tall like the search input, Use Map, and recents pull-down): card-colored with accent text for the two links, and the exact inverse (accent fill, `--on-accent` text) for the current page, which is inert; `--on-accent` is white in light and near-black in dark (§11). The card: bordered, a sideways NOW label on its left edge (13px/600, reads bottom-up like the chart row titles), big temp, icon with day/night variants, condition, feels-like + wind + gusts (nbsp-tied segments so a wrap moves whole pieces like "gusts 6" to the next line, breaking only at the · separators), next sun event as "sunset 8:21pm" / "sunrise 6:06am". Search box has the **Use Map** button and the square **GPS** button beside it (the input is 16px on phones, 2026-08-18: under 16px iOS Safari zooms the page on focus and leaves it zoomed); the page-nav row lives under the coordinates line in the title block (desktop - on phones placeNav moves it below the search column, see §1). Cascade note: the narrow-screen @media block must stay AFTER the base header rules or it loses the tie.
 
+**Header row 2** (2026-09-30): the HRRR label at the left and the **Imperial | Metric** switch (§12) centered under the NOW card, on the card's own 26px plot-center shift. The HRRR label is only as wide as its text now (`justify-self: start`): it used to stretch across the whole row, so a click in the empty space under the NOW card - exactly where the switch went - silently toggled the HRRR overlay. Between 901 and 1000px the search column's fixed 345px starves the title column (78px at 920), which pulls the card and the switch left into the HRRR label, so the label takes a row of its own in that band. Stacked and on phones the switch sits directly under the NOW card, above the search box. Units named anywhere in this section are the Imperial ones; the switch converts them at display time (§12).
+
 **Location entry, three ways:**
 1. Search box: Open-Meteo geocoding, dropdown, Enter picks first.
 2. **Use Map**: modal with OSM map, click drops a pin, "Use this location". Both the map path and the GPS path hand their pick to `setLocation` (`selectLoc` on weather365), which **owns the naming-promise hygiene** (2026-08-18): it strips `naming` before any save - no promise junk in localStorage - and adopts a late-landing name in place, re-saving and re-rendering, so a quick "Use this location" click before Nominatim answers no longer strands the saved city as raw coordinates on reload. (Before this the discipline lived only in the GPS path; map picks saved `"naming":{}` stubs and could freeze as coordinates.) Naming chain: Nominatim locality for land clicks; when no locality comes back (water), BigDataCloud's free reverse-geocode-client names the body of water and the result reads "Pacific Ocean near Avalon" style, with the "near" harbor taken from the nearest NOAA tide station within 80 mi (first comma-part of the station name). Far offshore it is just the water name; if everything fails, the coordinates stand. **Nominatim failing outright (down, refused, rate-limited) falls through to the same BigDataCloud naming - it names land spots too** (2026-08-18; before that a dead Nominatim stranded GPS picks as coordinates). Never trust Nominatim's `j.name` (it returns "United States" for territorial water - the original bug).
@@ -127,7 +129,7 @@ Recents are a pull-down under the search row, in a flex row (#recrow) with the s
 | Clouds | cloud cover gray area + precip chance blue area (ensemble), HRRR dashes |
 | Visibility | line (not area - it pins at 10+ mi most days), **axis climbs the 2.5 / 5 / 10 mi ladder** (it stops at 2.5 so the 1 mi fog line can never become the ceiling; readings above 10 are capped, and the legend says "10 = clear" only when the top really is 10), orange dashed line at 1 mi over a tan "fog" band (best-match model). OVERLAID with wildfire smoke / air quality: brown dashed US AQI line on **its own ladder, 50 / 100 / 150 / 200** - the EPA category boundaries, so the top rung doubles as the worst category the period reaches (air-quality API, 7 day horizon, values over 200 pinned); tooltip gives the number, the category word, and PM2.5; the AQI legend renders only when the overlay has data (2026-08-18). |
 | Precip | accumulation area + hourly precip line. **Axis climbs the 0.1 / 0.25 / 0.5 / 1 / 2 / 3 / 5 / 10 in ladder** (`niceTop` above 10), scanned across the period rather than read off `accum[HOURS - 1]` so a null tail past the model's range cannot read as a dry week. The 3 in rung exists because 2 -> 5 was the worst gap on the ladder and a real Miami week (2.08 in) landed in it, filling 41% of the row; it now fills 69%. |
-| Tide | NOAA hourly tide curve (ft MLLW), every high/low labeled with height + time; **current overlaid** in purple on its own ± scale around a dotted zero (+flood / -ebb, knots), built by cosine-interpolating NOAA's MAX_SLACK events, with direction arrows every 3h (same glyph and size as the wind arrows) pointing the compass set of the water (station meanFloodDir/meanEbbDir, suppressed under 0.4 kn near slack) and "toward SE" wording in the tooltip. Tide heights are always signed (+/-, sgnFt()). **The station is captioned in black inside the plot, top-left** ("Tides at SEATTLE (Madison St.), Elliott Bay · 8.7 mi from Kirkland"; phones drop the "Tides at" head and the city and keep the first comma-part of the station name, and an over-long name truncates on the legend's ~6.1px-per-char estimate) - per Ken 2026-08-22, because on a wide chart the right-edge legend sits a screen away from the TIDE title and an inland city read Elliott Bay's tides as its own. A high cresting under the caption prints its label below its dot instead of behind the text. The tide legend itself is now just "Tide (ft)"; the current legend names its station only in the weak-and-variable note, and its distance nowhere. Row only exists when a tide station is within 60 mi (currents within 25 mi). Station fallback: the nearest 3 stations are tried in order because some listed stations (e.g. Admiralty Head) serve no hourly MLLW predictions; if a station only serves high/low (subordinate stations), the hourly curve is SYNTHESIZED by cosine interpolation between the hilo extremes (the failed hourly attempts surface as caught NOAA 400s in the console - normal). Many stations return the literal string "Currents are weak and variable" - shown in the legend as NOAA's answer. |
+| Tide | NOAA hourly tide curve (ft MLLW), every high/low labeled with height + time; **current overlaid** in purple on its own ± scale around a dotted zero (+flood / -ebb, knots), built by cosine-interpolating NOAA's MAX_SLACK events, with direction arrows every 3h (same glyph and size as the wind arrows) pointing the compass set of the water (station meanFloodDir/meanEbbDir, suppressed under 0.4 kn near slack) and "toward SE" wording in the tooltip. Tide heights are always signed (+/-, sgnH()). **The station is captioned in black inside the plot, top-left** ("Tides at SEATTLE (Madison St.), Elliott Bay · 8.7 mi from Kirkland"; phones drop the "Tides at" head and the city and keep the first comma-part of the station name, and an over-long name truncates on the legend's ~6.1px-per-char estimate) - per Ken 2026-08-22, because on a wide chart the right-edge legend sits a screen away from the TIDE title and an inland city read Elliott Bay's tides as its own. A high cresting under the caption prints its label below its dot instead of behind the text. The tide legend itself is now just "Tide (ft)"; the current legend names its station only in the weak-and-variable note, and its distance nowhere. Row only exists when a tide station is within 60 mi (currents within 25 mi). Station fallback: the nearest 3 stations are tried in order because some listed stations (e.g. Admiralty Head) serve no hourly MLLW predictions; if a station only serves high/low (subordinate stations), the hourly curve is SYNTHESIZED by cosine interpolation between the hilo extremes (the failed hourly attempts surface as caught NOAA 400s in the console - normal). Many stations return the literal string "Currents are weak and variable" - shown in the legend as NOAA's answer. |
 | Water | teal sea-surface-temperature line + soft fill, whole-degree axis. Marine-model data; the row appears only where the model has values (salt water). |
 
 Station lookup uses `data/tide-stations.json` and `data/current-stations.json`: pre-trimmed copies of NOAA's station metadata (340KB total vs NOAA's 5.6MB), regenerated by **`tools/refresh-stations.py`** (checked in 2026-08-18 - the row shape `[id,name,lat,lng]` / `[id,currbin,name,lat,lng]` is positional and load-bearing, so regeneration is a script with shape asserts, not a hand ritual). **The forecast pages cache the parsed lists in localStorage** (`bw_stations_tide` / `bw_stations_current`, §7) behind the `STATIONS_V` constant (2026-08-18): the two files are ~117KB gzipped - 75% of a cold load - and GitHub Pages stamps deploy time into every ETag, so before the cache they re-downloaded in full after every push. **Bump `STATIONS_V` whenever the data files regenerate.** Both station loads start alongside the forecast fetch instead of after its round-trip, `loadStations` memoizes the in-flight promise (no overlapping double-fetch), and the water-naming chain reuses it instead of a second raw fetch. A hard failure from one tide station (network error, non-JSON body) advances to the next candidate (2026-08-18), like the graceful no-data walk always did.
@@ -170,6 +172,7 @@ Two `Math.min` calls in that code are **load-bearing in a way that is easy to mi
 - Precipitation chart: daily average area + dark smoothed weekly-average curve (7 day circular mean then triangular kernel). Tooltip shows the day and the month total.
 - Same header kit as the forecast pages (search, map, share, recents, spinner). The title, tab identity and footer year span render at boot as well as on data (2026-08-18, same rule as the forecast pages - this page has the site's longest wait, the worst place to flash a generic heading), and the search box carries weather10's newer guards (2026-08-18): stale-response `searchSeq`, the hidden-dropdown Enter guard (Enter used to click an invisible stale row), and a visible "Search failed" instead of silence. The loading spinner carries the caption "Collecting 10 years of weather data" (2026-08-18: on slow devices the bare circle did not explain itself; the ERA5 crunch is this site's longest wait). No reorder/resize (two fixed rows). The selected city is shared with the forecast pages via `bw_current` (see §7), so switching Daily <-> Historical never changes location.
 - **Phones (under 600px, added 2026-08-18): same reading method as the forecast pages.** The chart fits the screen (300px floor instead of 900, no sideways scroll - the year curves stay legible compressed), month labels shrink to single letters, and every legend right-hugs the plot edge by post-render measurement (g.lgstack, like the forecast pages), and overlong ones stack one item per line, swatches aligned in one column with ragged text (the 4-item temperature legend). Dragging horizontally slides the orange crosshair with a date chip ("Jul 7") riding it (`touch-action: pan-y` keeps vertical swipes scrolling); a tap opens the reading card centered on the screen over a dim backdrop, tap anywhere dismisses. Same tap rules as the forecast pages: 30px near-line grace, 10px drag slop, tap under 600ms. The `PHONE` flag mirrors the forecast pages' `DAILY` (no day window here - the whole year is always visible).
+- **The Imperial | Metric switch** (2026-09-30, §12) sits in a row of its own centered over the plot, where the forecast pages hang it under the NOW card; on phones it sits under the title, the slot the NOW card fills there, so it is in the same place on every page. Metric converts the temperatures (gridlines every 5 or 10 °C, doubling past a 30° span, the twin of 10/20 past 55 °F) and the precipitation (mm/day, month totals to the whole mm). The ERA5 fetch and the `bw2norm3` cache stay in °F and inches, so flipping it never re-crunches the 10 years.
 
 ## 7. localStorage keys
 
@@ -178,6 +181,7 @@ Two `Math.min` calls in that code are **load-bearing in a way that is easy to mi
 | `bw_current` | Selected city, **shared by all three pages** (2026-08-18, so Daily <-> Historical keeps the location; before that the historical page had its own `bw2_current`, which is migrated into `bw_current` on first load and removed) |
 | `bw_recents` | Shared recents list (max 8) |
 | `bw_hrrr` | HRRR overlay toggle |
+| `bw_units` | Imperial \| Metric switch, `"imperial"` or `"metric"`, shared by all three pages (2026-09-30, §12). Only the exact string `"metric"` means Metric; unset or garbage reads as Imperial |
 | `bw_sizes` | Row heights (forecast pages) |
 | `bw_order` | Row order (forecast pages) |
 | `bw2norm3:lat,lon` + `bw2norm3_keys` | Historical per-city cache + LRU list (entries record their `years` window since 2026-08-18) |
@@ -191,7 +195,7 @@ Share-link visits never write `bw_current`, so opening someone's link does not c
 - No waves, no Small Craft Advisories, no live buoy observations yet (candidate next features; NWS/NOAA feeds are free and public domain).
 - Visibility is a model estimate from the best-match call, not from the backbone, and fog is the hardest thing any model predicts. **Do not move this row onto the NBM backbone** - measured 2026-08-22 and it loses on all three axes that matter. Horizon: NBM returns visibility for only ~90 of 240 hours (90-93 at five spread CONUS sites, where its temperature is 240/240), so days 4-10 of the row would simply go blank. Dynamic range: at Fresno, NBM spans 16200-16320 m across 7 distinct values, standard deviation 40 m - a flat line - where best-match spans 24140-90000 m across 51 values. And the fog band, which is the entire point of the row: best-match dips to 300 m at San Diego with 5 hours under the 1 mile threshold, while NBM's floor there is 6360 m and it never goes below 1 mile anywhere tested. The earlier "NBM publishes visibility so it could move" note came from a 2-day spot check that showed 48/48 non-null; at 10-day scale that reading does not hold.
 - Nominatim is rate-limited (courtesy service): fine for one click at a time, never for bulk lookups.
-- Wind is in mph to match Wunderground habits; knots has been discussed but not built.
+- Imperial is the default, to match Wunderground habits; the Metric switch (§12) covers every unit on the site. Knots for wind was offered and declined (Ken 2026-09-29); tidal current stays in knots in both systems.
 - **Hourly contract, verified 2026-08-18:** Open-Meteo emits exactly 24 uniquely-labeled rows per local calendar day straight through both DST transitions (checked against the archive API for the Nov 2 2025 fall-back and Mar 9 2025 spring-forward: 24 rows each, zero duplicate or skipped labels, including a synthetic 02:00 on the spring night). The site's 24-per-day stride - day chunks, night shading, the pager, the byTime join - is correct by that contract; if Open-Meteo ever changed it, everything after a transition day would shift an hour. **Re-verified for NBM 2026-08-22** when the backbone moved off ECMWF, because the stride now depends on a different model honoring the same contract: `ncep_nbm_conus` returns an `hourly.time` array identical to `ecmwf_ifs025` element for element at every location tested, 24 unique labels on both transition days with zero nulls, checked at Seattle, Minneapolis and Caribou with no-DST Phoenix as a control. `utc_offset_seconds` matches too, which matters because `build()` derives `nowIdx` from it. Re-check this whenever the backbone model changes again - it is the join every other series depends on.
 - Tide/current times are requested station-local (`time_zone=lst_ldt`) and matched against city-local hour labels, so a station across a timezone boundary from the city (possible inside the 60-mile radius near a zone seam) would shift the whole curve one hour. Accepted 2026-08-18: the caption always names the station, and the fix (request GMT, convert with `utc_offset_seconds`) can wait until a real city hits it.
 - Sun times ignore the ISO date part and hard-code am/pm, so above ~62°N in midsummer (after-midnight sunsets - Fairbanks in June) the night shading inverts and "sunset 12:47am" prints as pm. Accepted 2026-08-18 until high-latitude cities matter; polar day/night itself (no sunrise/sunset at all) is handled.
@@ -201,6 +205,7 @@ Share-link visits never write `bw_current`, so opening someone's link does not c
 ## 9. House copy rules
 
 - "N Day Forecast" (no hyphen, capital D), "homepage" not "landing page", lowercase tight am/pm on sun times and the header's "updated" stamp ("6:05am", "updated 7:18am"), no em dashes in copy.
+- Units: "km/h", never "kph" (per Ken 2026-09-29). The switch reads IMPERIAL | METRIC, all caps (per Ken 2026-09-30).
 - US state names display as USPS abbreviations everywhere they render - h1, recents rows, search dropdown, all pages ("Kirkland, WA", per Ken 2026-08-18). Display-only via `US_STATE` + `admin1Label()`: stored cities, recents and share links keep the full name. 50 states + DC; non-US admin1 ("Bourgogne") untouched.
 - The h1's trailing phrase is one unbreakable unit on every page - "Daily Weather Forecast" / "3 Day Weather Forecast" / "10 Day Weather Forecast" / "Average Year (2016-2025)" never break internally (runtime nbsp on every internal space, 2026-08-18): a long city name wraps BEFORE the whole phrase ("...near Jersey (JE) / 3 Day Weather Forecast"). **When the whole title fits one line, a bullet separates city and phrase** ("San Diego, California · 10 Day Weather Forecast"); setTitle() measures with nowrap (sub-pixel, via Range - integer scrollWidth dropped the bullet a pixel early) and falls back to the plain wrapping title when the bulleted one will not fit. **On the forecast pages the fit limit is the distance to the NOW card, not the title column**: the equal-1fr header sides make the title column narrow (~450px even at 1400px windows, which silently wrapped long titles), but the gap left of the centered card is empty, so a one-line title keeps nowrap and runs into it, stopping 16px shy of the card (found 2026-08-18 chasing a missing bullet at Ken's window width). renderTitle() therefore runs AFTER renderNow() in render (the card must be placed to measure) plus once at boot (phones never flash the static 10 Day heading). Stacked/phone layouts measure the full-width column as usual. Re-measured every render, so resizes flip it correctly.
 
@@ -214,8 +219,10 @@ than restating the rules: `ladder()`, `niceTop()`, the visibility and AQI max-sc
 predicate are all extracted from the page and executed. A test carrying its own copy of the logic stops
 testing the page the moment someone edits the page, which is exactly when it matters. It covers every
 ladder rung and its boundaries (the top is the *lowest* rung that fits, the top gridline actually draws,
-no label lies about its value - `0.25` must never print as `0.3`, no divisor reaches zero); the tide
-axis's quarter steps under the same no-lying-label rule (2026-09-30); both
+no label lies about its value - `0.25` must never print as `0.3`, no divisor reaches zero), for the
+Imperial and the Metric precip ladders both, read from the page's own unit tables; the tide axis's quarter
+steps under the same no-lying-label rule (2026-09-30), in feet and in metres; the unit converters, the
+`bw_units` read, and weather365's copy of the tables held to the same factors (§12); both
 `Math.min` caps, executed rather than assumed; `backboneFallback()` against the eighteen failure shapes
 catalogued 2026-08-22, 2026-09-16 and 2026-09-18, of which **exactly nine** may divert to ECMWF - two as
 `"coverage"` and seven as `"unavailable"` - and **nine must stay errors**, the 400s we caused and the
@@ -241,7 +248,7 @@ cap in the harness, so they passed on a page that had lost `Math.min(vis, 10)` e
 weather3 copy tripwire noticed. **If you add a case here, break the code once and confirm your new
 assertion is what fails, not something incidental.**
 
-Since 2026-09-18 that is written down as **`py tools/mutation-check.py`**, which breaks twelve lines one
+Since 2026-09-18 that is written down as **`py tools/mutation-check.py`**, which breaks eighteen lines one
 at a time and asserts the intended check is the one that reddens. It is by hand and **not in CI**, same
 column as `--live`: its needles are exact source lines, so a legitimate edit to one of them fails it with
 "needle not unique" and would redden a good commit. It mutates `weather10/index.html` in place and
@@ -249,7 +256,10 @@ restores it in a `finally`, then asserts the file is byte-identical at the end; 
 enough to skip that, `git checkout weather10/index.html` and re-run `gen-weather3.py`. **Read a mutation
 that fails to go red as a bug in the mutation first and the assertion second** - two of the original
 seven were wrong that way, one needle written LF against a CRLF working tree (section 4 again) and one
-"widened" regex that happened not to match the fixture either.
+"widened" regex that happened not to match the fixture either. A third way surfaced 2026-09-30: a
+mutation of the very line a test cut out by an exact regex made the suite stop at "could not find"
+rather than fail a check, which reads as 0 red. Cut whole blocks between stable anchors instead (the
+units checks run everything from `function keep` to `var U = ...`), so a mutated line inside is run.
 
 ---
 
@@ -259,7 +269,9 @@ seven were wrong that way, one needle written LF against a CRLF working tree (se
 attribute: the whole switch is `prefers-color-scheme`. That was Ken's call 2026-09-13, and it buys more
 than it gives up - there is no saved choice that can drift out of step with the OS, nothing to restore
 before first paint (so no anti-flash boot script, and no new inline script for the CSP to cover), and no
-control competing for room in a header that is already full on a phone. **If a manual override is ever
+control competing for room in a header that is already full on a phone. (Since 2026-09-30 the header
+does carry one control of that kind, the Imperial | Metric switch of §12, at Ken's request; the reasoning
+for the theme stands.) **If a manual override is ever
 wanted, the work is a `data-theme` attribute on `<html>` plus a `bw_theme` key; every color is already
 behind a name, so nothing below has to change** - only where the names get their values.
 
@@ -319,3 +331,69 @@ values are deliberately identical between them so the two blocks diff cleanly.
 and color is not logic. A wrong hex is caught by looking at the page in both schemes, which is what the
 browser's color-scheme emulation is for. What the suite does still guarantee is that the inline script
 parses - which is the failure mode that actually matters when the `COL` tables are edited by script.
+
+---
+
+## 12. Units
+
+**One switch, Imperial | Metric, drives every unit on the site** (Ken 2026-09-29: he first asked for
+separate °F/°C and mph/kph switches, then folded them into one once the plan listed everything else
+that would have stayed imperial). Imperial is the default. It is remembered per browser in `bw_units`
+(§7) and shared by all three pages, so it survives reloads and Daily <-> Historical; a phone and a
+desktop each keep their own, because the site has no server to sync through. Share links do not carry
+it - whoever opens one sees their own choice.
+
+**The data stays imperial; only the display converts.** Every fetch still asks for °F, mph and inches,
+NOAA still answers in feet, and `build()` still turns visibility into miles. Each page converts where it
+shows a value, through a pair of tables, `UNITS_IMPERIAL` / `UNITS_METRIC`, swapped the way
+`COL_LIGHT` / `COL_DARK` are (§11) and for the same reason: two whole tables, so a row can be read
+against its twin. Every entry takes the imperial value. That buys three things: flipping the switch is
+a redraw, with no refetch and no spinner; every rule in the data code (the dry-day test, the day-icon
+and fog thresholds, the station radii) keeps one set of numbers; and weather365's `bw2norm3` cache,
+stored in °F and inches, stays valid across the flip. The converters pass `null` through, so a missing
+hour stays missing rather than drawing as -17.8 °C.
+
+| | Imperial | Metric |
+|---|---|---|
+| Temperature (air, feels-like, water, historical) | °F, gridlines every 10° (Historical 10/20, doubling past a 55° span), 3° headroom | °C, every 5° (Historical 5/10, doubling past 30°), the same 3 °F of headroom |
+| Water temperature row headroom | 2° | 1° |
+| Wind and gusts | mph; the axis tops at the exact max gust, floor 5 | km/h; the same rule, floor 8 |
+| Precipitation | in; ladder 0.1 / 0.25 / 0.5 / 1 / 2 / 3 / 5 / 10 | mm; ladder 2.5 / 5 / 10 / 25 / 50 / 75 / 125 / 250, readings to 0.1 |
+| Visibility | mi; 10 = clear, fog under 1 | km; 10 = clear, fog under 1 |
+| Tide heights | ft to 0.1; axis bounds round out to whole feet | m to 0.01; bounds round out to 0.4 m |
+| Elevation, tide station distance | ft, mi | m, km |
+| Tidal current | kn | kn |
+
+The rows that are not simple conversions, and why:
+
+- **Axes are bracketed in the shown unit**, so their gridlines land on round numbers there; re-labelling
+  the °F grid would have printed 4.4 / 10 / 15.6 °C. The °C step is half the °F one because a 10° step
+  left the week of 2026-09-29 at Kirkland filling 44% of the row, against 60% in °F; 5° fills 66%.
+- **The mm ladder** has the inch ladder's spacing (worst gap 2.5x in both), and 75 does the 3 in rung's
+  job: the Miami week that earned the 3 in rung (§5), 2.08 in, is 52.8 mm and lands on 75.
+- **Visibility keeps its numbers, not its physical lines** (Ken 2026-09-30): 10 km reads clear and fog is
+  under 1 km, the metric world's own thresholds, rather than 16.1 km and 1.6 km converted. One piece of
+  code serves both, since the cap, the ladder and the fog line are all "in the shown unit". Worth knowing:
+  the fog band sits a little lower in Metric, so an hour at 1.3 km (0.8 mi) is fog in Imperial and not in
+  Metric. **The max scan converts before it caps**, so the value that feeds the ladder is in km like the
+  rest of the row; the suite pins that order.
+- **The tide axis in metres** rounds its bounds out to 0.4 m, the finest grain whose quarter steps always
+  print exactly at one decimal (feet round out to whole feet and print two decimals when a quarter step
+  needs them, §5). Its labels guard against float noise printing a zero line as "-0.0". Readings go to
+  the centimetre, because a tenth of a metre is 4 in, coarser than the feet labels.
+- **Tidal current stays in knots in both** (Ken 2026-09-30): it is the unit metric countries' own tide
+  tables use. Knots for wind was offered and declined.
+
+**The switch** is a 13px all-caps pill (Ken 2026-09-30), the side in force wearing the current-page nav
+chip's look (accent fill, `--on-accent` ink), so it themes for free. A `::before` stretches its tap target
+to 29px without growing the pill - 13px alone is too small for a thumb. Forecast pages: under the NOW card
+(§5). Historical: its own row centered over the plot, where a 34px left padding moves the center by
+(PADL - PADR) / 2 = 17px without the page overflow a transform on a full-width row would cause; on phones
+under the title (§6). Its handlers use `addEventListener`, so it adds nothing to the inline-handler debt
+that keeps `'unsafe-inline'` in the CSP (§2).
+
+**Three files, three copies** (§11): weather10 (and so weather3) and weather365 each carry their own
+tables, weather365's the shorter (temperature, precipitation, elevation). The suite (§10) runs the ladder
+checks over both of weather10's tables, checks both tables carry the same entries, pins the converters and
+the `bw_units` read, and holds weather365's copy to the same factors. **A unit change is edited in both
+pages' tables, then weather3 is regenerated.**
