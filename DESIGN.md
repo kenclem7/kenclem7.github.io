@@ -136,7 +136,9 @@ Station lookup uses `data/tide-stations.json` and `data/current-stations.json`: 
 
 **Y axes scale to the data, and the ladder is the rule** (2026-09-03). Every row's axis tops at what the
 period actually reaches; none is a fixed range chosen in advance. Temperature, tide, current and water
-temperature bracket their own min/max. Precip, visibility and AQI climb a **ladder** of round numbers -
+temperature bracket their own min/max (the tide axis cuts its span into four equal steps, which are not
+round numbers - a 3 ft span steps 0.75 - so its labels print two decimals when a step needs them; at one
+fixed decimal the -0.25 gridline read "-0.3", fixed 2026-09-30 in `tideAxis()`). Precip, visibility and AQI climb a **ladder** of round numbers -
 the lowest rung at or above the max - via `ladder(max, rungs, steps)`, which returns the rung paired with
 a gridline step that divides it exactly, because `grid()`'s loop drops a top line that a step does not
 land on. Two deliberate exceptions, both of which look like oversights and are not. **Wind** tops at the
@@ -212,7 +214,8 @@ than restating the rules: `ladder()`, `niceTop()`, the visibility and AQI max-sc
 predicate are all extracted from the page and executed. A test carrying its own copy of the logic stops
 testing the page the moment someone edits the page, which is exactly when it matters. It covers every
 ladder rung and its boundaries (the top is the *lowest* rung that fits, the top gridline actually draws,
-no label lies about its value - `0.25` must never print as `0.3`, no divisor reaches zero); both
+no label lies about its value - `0.25` must never print as `0.3`, no divisor reaches zero); the tide
+axis's quarter steps under the same no-lying-label rule (2026-09-30); both
 `Math.min` caps, executed rather than assumed; `backboneFallback()` against the eighteen failure shapes
 catalogued 2026-08-22, 2026-09-16 and 2026-09-18, of which **exactly nine** may divert to ECMWF - two as
 `"coverage"` and seven as `"unavailable"` - and **nine must stay errors**, the 400s we caused and the
@@ -238,7 +241,7 @@ cap in the harness, so they passed on a page that had lost `Math.min(vis, 10)` e
 weather3 copy tripwire noticed. **If you add a case here, break the code once and confirm your new
 assertion is what fails, not something incidental.**
 
-Since 2026-09-18 that is written down as **`py tools/mutation-check.py`**, which breaks eleven lines one
+Since 2026-09-18 that is written down as **`py tools/mutation-check.py`**, which breaks twelve lines one
 at a time and asserts the intended check is the one that reddens. It is by hand and **not in CI**, same
 column as `--live`: its needles are exact source lines, so a legitimate edit to one of them fails it with
 "needle not unique" and would redden a good commit. It mutates `weather10/index.html` in place and

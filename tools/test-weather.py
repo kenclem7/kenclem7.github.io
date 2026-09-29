@@ -142,6 +142,26 @@ def offline():
                 lied.append((r["top"], lab))
     check("precip: every label equals its gridline value", not lied, str(lied[:3]))
 
+    # The tide axis is no ladder - it brackets the data and cuts the span into four equal steps -
+    # but the same lie was open to it: a 3 ft span steps 0.75, and at one fixed decimal its -0.25
+    # gridline printed "-0.3". Sweep spans of every width mod 4, either side of the zero line.
+    spans = [(lo, round(lo + w, 2)) for lo in (-3.3, -1.2, -0.5, 0, 0.3, 1.1)
+             for w in (0.05, 0.3, 0.9, 1.7, 2.0, 2.6, 3.4, 5.5, 8.2, 11.9, 15.3, 22.7)]
+    tx = node(extract(src, "tideAxis") + ";var S=" + json.dumps(spans) + ";"
+              "console.log(JSON.stringify(S.map(function (p) {"
+              "  var t = tideAxis(p[0], p[1]), g = [];"
+              "  for (var v = t[0]; v <= t[1] + 1e-9; v += t[2]) g.push([v, t[3](v)]);"
+              "  return { lo: p[0], hi: p[1], bottom: t[0], top: t[1], g: g }; })));")
+    lied = [(t["lo"], t["hi"], lab) for t in tx for v, lab in t["g"] if abs(float(lab) - v) > 1e-9]
+    check("tide: every label equals its gridline value", not lied, str(lied[:3]))
+    check("tide: the -0.25 gridline reads -0.25, not -0.3",
+          "-0.25" in [lab for t in tx if (t["lo"], t["hi"]) == (-0.5, 1.5) for _, lab in t["g"]])
+    wrong = [(t["lo"], t["hi"]) for t in tx if not (t["bottom"] <= t["lo"] and t["top"] >= t["hi"])]
+    check("tide: axis brackets the data", not wrong, str(wrong[:3]))
+    wrong = [(t["lo"], t["hi"], len(t["g"])) for t in tx
+             if len(t["g"]) != 5 or abs(t["g"][-1][0] - t["top"]) > 1e-9]
+    check("tide: five gridlines, the top one drawn", not wrong, str(wrong[:3]))
+
     # The caps are load-bearing twice over: they bound the drawn line AND they bound the max that
     # feeds the ladder, so losing one would ladder the axis to a nonsense top. The sweep above
     # applies the caps itself, which means it would happily pass on a page that had lost them -

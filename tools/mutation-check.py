@@ -77,6 +77,10 @@ MUTATIONS = [
      '                  unavailable: "ECMWF model (NBM unavailable)" };',
      '                  unavailable: "ECMWF model (outside NBM coverage)" };',
      ["NBM unavailable names ECMWF and why", "the two fallbacks do not read the same"]),
+    ("tide axis labels back to one fixed decimal",
+     "  var dec = Math.round(step * 100) % 10 === 0 ? 1 : 2;       /* the precip labels' rule */",
+     "  var dec = 1;",
+     ["tide: every label equals its gridline value", "the -0.25 gridline reads -0.25"]),
 ]
 
 

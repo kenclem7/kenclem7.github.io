@@ -527,6 +527,17 @@ function ladder(m, rungs, steps) {
   for (var i = 0; i < rungs.length - 1; i++) if (m <= rungs[i]) return [rungs[i], steps[i]];
   return [rungs[rungs.length - 1], steps[steps.length - 1]];
 }
+/* The tide axis brackets its own data - 15% headroom either side, never under 0.4 ft - with the
+   bounds rounded out to whole feet and the span cut into four equal steps. Those steps are not
+   round numbers (a 3 ft span steps 0.75), so the labels print as many decimals as the step needs:
+   at one fixed decimal the -0.25 gridline read "-0.3" and 1.25 read "1.3", the same label lying
+   about its line that the precip ladder's 0.25 -> "0.3" was. Returns [bottom, top, step, label fn]. */
+function tideAxis(lo, hi) {
+  var pad = Math.max(0.4, (hi - lo) * 0.15);
+  var a = Math.floor(lo - pad), b = Math.ceil(hi + pad), step = (b - a) / 4;
+  var dec = Math.round(step * 100) % 10 === 0 ? 1 : 2;       /* the precip labels' rule */
+  return [a, b, step, function (v) { return v.toFixed(dec); }];
+}
 function fmtHour(h) { var ap = h < 12 ? "AM" : "PM"; var v = h % 12; if (v === 0) v = 12; return v + " " + ap; }
 function fmtClock(i) {                       /* fractional hour column -> "10:13am" */
   var h = Math.floor(i) % 24, m = Math.round((i - Math.floor(i)) * 60);
@@ -1209,11 +1220,9 @@ function render() {
   /* ---- tide + current ---- */
   if (SEC.tide) {
     var td = data.tide, tvals = td.h.filter(function (v) { return v !== null; });
-    var dlo = Math.min.apply(null, tvals), dhi = Math.max.apply(null, tvals);
-    var dpad = Math.max(0.4, (dhi - dlo) * 0.15);
-    var tLo = Math.floor(dlo - dpad), tHi = Math.ceil(dhi + dpad);
+    var tax = tideAxis(Math.min.apply(null, tvals), Math.max.apply(null, tvals)), tLo = tax[0], tHi = tax[1];
     var yD = function (v) { return SEC.tide.y + SEC.tide.h * (1 - (v - tLo) / (tHi - tLo)); };
-    grid(s, SEC.tide, tLo, tHi, (tHi - tLo) / 4, function (v) { return v.toFixed(1); });
+    grid(s, SEC.tide, tLo, tHi, tax[2], tax[3]);
     if (tLo < 0) s.push('<line x1="' + PADL + '" y1="' + yD(0).toFixed(1) + '" x2="' + (W - PADR) + '" y2="' +
                         yD(0).toFixed(1) + '" stroke="' + COL.zero + '" stroke-width="1" stroke-dasharray="3 3"/>');
     s.push('<path d="' + areaPath(td.h, yD, SEC.tide.y + SEC.tide.h) + '" fill="' + COL.tideFill +
