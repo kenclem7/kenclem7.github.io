@@ -173,6 +173,9 @@
             color: var(--ink); cursor: pointer; }
   #recbtn:hover { border-color: var(--accent); }
   #recbtn .caret { color: var(--ink-faint); font-size: 16px; line-height: 16px; }
+  /* a long name ends in "…": wrapping grew the button past its 34px (breaking the row's bottom
+     line), and one long word spilled past the button and scrolled the page sideways */
+  #recbtnlabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #recmenu { position: absolute; top: 100%; left: 0; right: 0; z-index: 50; background: var(--surface); border: 1px solid var(--field-bd);
              border-radius: 0 0 6px 6px; box-shadow: 0 6px 16px var(--shadow-2); max-height: 260px; overflow-y: auto; }
   #recmenu .row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; font-size: 13.5px; cursor: pointer; }
