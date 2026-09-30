@@ -70,7 +70,11 @@
   .page { margin: 0 auto; padding: 14px 20px 30px; }
   .card { background: var(--surface); border: 1px solid var(--surface-bd); border-radius: 8px; padding: 16px 16px 8px; }
 
-  header { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: flex-end; margin-bottom: 6px; }
+  /* --plotshift is how far the chart's plot center sits right of the page center, (PADL - PADR) / 2
+     in the script; the units row's left padding uses it. CSS cannot read the script's constants, so
+     a change to either one updates this by hand */
+  header { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: flex-end; margin-bottom: 6px;
+           --plotshift: 17px; }
   .titleblock { flex: 1 1 340px; min-width: 260px; }
   h1 { font-size: 22px; font-weight: 600; letter-spacing: .2px; }
   #locmeta { font-size: 12px; color: var(--ink-soft); margin-top: 3px; }
@@ -81,10 +85,10 @@
   .searchwrap { position: relative; flex: 0 1 345px; min-width: 250px; }
   /* Imperial | Metric (DESIGN.md section 12): a row of its own centered over the plot - the forecast
      pages hang it under the NOW card - and on phones straight under the title, the slot the NOW
-     card fills there, so the switch sits in the same place on every page. The 34px left padding
-     moves the center onto the plot, (PADL - PADR) / 2 = 17px, without the page overflow a
-     transform on a full-width row would cause. */
-  #units { order: 1; flex: 0 0 100%; display: flex; justify-content: center; padding-left: 34px; }
+     card fills there, so the switch sits in the same place on every page. A left padding of twice
+     --plotshift moves the center onto the plot without the page overflow a transform on a
+     full-width row would cause. */
+  #units { order: 1; flex: 0 0 100%; display: flex; justify-content: center; padding-left: calc(2 * var(--plotshift)); }
   @media (max-width: 600px) { #units { order: 0; padding-left: 0; } }
   /* a 13px all-caps pill (per Ken 2026-09-30). The side in force wears the current-page nav chip's
      look, accent fill with the ink flipped against it; the other reads as a link, like the nav.
@@ -270,7 +274,7 @@
 <script>
 "use strict";
 /* ---------- constants ---------- */
-var PADL = 46, PADR = 12, DAYS = 365;
+var PADL = 46, PADR = 12, DAYS = 365;   /* (PADL - PADR) / 2 is --plotshift in the CSS: update it with these */
 var YEAR_START = "2016-01-01", YEAR_END = "2025-12-31", YEARS_LABEL = "2016-2025";
 var MDAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 var MNAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
