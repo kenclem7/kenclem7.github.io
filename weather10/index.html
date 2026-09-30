@@ -82,13 +82,11 @@
   /* grid with equal 1fr side columns puts the conditions card on the true page centerline; minmax(0, ...)
      holds them equal at every width (a plain 1fr let the search box's fixed 345px set its column's
      minimum, starving the title column to 97px at 920 and sliding the card off the plot center).
-     --plotshift is (PADL - PADR) / 2, the distance from the page center to the chart's plot center
-     while the chart fills its box (from ~1170px; narrower, the chart keeps its 1080px floor and
-     scrolls sideways, so the card sits left of the plot center). The NOW card, the units switch and
-     the search box's cap all use it. The script sets it from PADL and PADR at boot; the 26px here is
-     the same value, for the moment before the script runs */
+     --plotshift carries the NOW card, the units switch and the search box's cap from the page center
+     to the chart's plot center; placeShift() in the script measures it on every render. The 25px here
+     is its value while the chart fills its box, for the moment before the first render */
   header { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px 18px; align-items: end; margin-bottom: 6px;
-           --plotshift: 26px; }
+           --plotshift: 25px; }
   .titleblock { grid-column: 1; min-width: 0; }
   #nowbox { grid-column: 2; display: none; align-items: center; justify-content: center;
             transform: translateX(var(--plotshift)); }
@@ -110,8 +108,9 @@
   #locmeta button { border: none; background: none; color: var(--accent); cursor: pointer; font-size: 13px; padding: 0 2px; }
 
   /* capped one --plotshift short of its column: the shifted card overhangs its own column by exactly
-     that much (8px past the 18px column gap at 26px), so the cap keeps an 18px gap between card and
-     search at every width (the box narrows below 345px between the 1050 stacking point and ~1220px) */
+     that much, always past the 18px column gap (the shift is 25px or more), so the cap keeps an 18px
+     gap between card and search at every width (the box narrows below 345px under ~1220px, and
+     placeShift() never shifts it under 250px) */
   .searchwrap { grid-column: 3; justify-self: end; position: relative; width: 345px; max-width: calc(100% - var(--plotshift)); }
   .searchrow { display: flex; gap: 8px; }
   #q { flex: 1; min-width: 0; padding: 8px 10px; font-size: 14px; border: 1px solid var(--field-bd); border-radius: 6px; outline: none;
@@ -204,7 +203,8 @@
     header { grid-template-columns: 1fr; }
     .titleblock, #nowbox, #units, .searchwrap { grid-column: 1; }
     header .toggle, #units { grid-row: auto; }   /* one column: source order, the switch right under the card */
-    #nowbox { justify-content: center; }
+    #nowbox { justify-content: center; justify-self: center; }   /* card-wide: shifted, a stretched box would carry
+                                                                   its empty width past the page edge */
     .searchwrap { justify-self: stretch; width: 100%; max-width: none; }
   }
   .toggle { font-size: 12.5px; color: var(--ink-dim); display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
@@ -353,9 +353,6 @@ var IS3 = location.pathname.indexOf("/weather3") === 0;      /* ONE file serves 
                                                                 (byte-identical, tools/gen-weather3.py copies):
                                                                 the URL decides the window, DESIGN.md section 4 */
 var PADL = 64, PADR = 12, HOURS = IS3 ? 72 : 240, DAYSN = HOURS / 24;   /* PADL also holds the drag handles */
-/* the header's page-center -> plot-center shift, so these constants are its only source (the CSS
-   carries the same value for the moment before this runs) */
-document.querySelector("header").style.setProperty("--plotshift", (PADL - PADR) / 2 + "px");
 /* chart heights are user-resizable via corner grips; the minimum for every row is MINH below.
    Width is automatic: charts fill the browser (1080 floor scrolls sideways on small screens). */
 var STDH = 140;                              /* the standard chart row height (per Ken 2026-08-18) */
@@ -1113,6 +1110,26 @@ function placeNav() {
   else if (nav.parentNode !== tb) tb.appendChild(nav);
 }
 
+/* the NOW card and the units switch sit over the chart's plot center as the chart first appears
+   (scrolled to its left edge), measured rather than derived. While the chart fills its box that is
+   25px right of the header's center ((PADL - PADR) / 2, less 1 for W's 2px slack); below ~1170px the
+   chart keeps its 1080px floor and scrolls sideways, and the plot center sits farther right. Capped
+   where the card would collide (Ken 2026-09-30): in one row the search box keeps at least 250px, the
+   Historical page's own minimum, but the shift never drops under 25px; stacked, the card stays inside
+   the header. Phones drop the shift in CSS. render() calls this after renderNow() sizes the card and
+   before renderTitle() measures the gap beside it, so data, the units switch and every resize
+   re-place it. */
+function placeShift() {
+  var hd = document.querySelector("header"), scr = document.querySelector(".scroller"), card = document.querySelector(".nowcard");
+  if (!hd || !scr || !card || DAILY) return;
+  var h = hd.getBoundingClientRect(), base = (PADL - PADR) / 2 - 1;
+  var want = scr.getBoundingClientRect().left + (W + PADL - PADR) / 2 - (h.left + h.width / 2);
+  var cols = getComputedStyle(hd).gridTemplateColumns.split(" ");
+  var room = cols.length === 3 ? parseFloat(cols[2]) - 250                  /* one row: the search column less 250px */
+                               : (h.width - card.getBoundingClientRect().width) / 2;   /* stacked: the card's slack */
+  hd.style.setProperty("--plotshift", Math.min(Math.round(want), Math.max(base, Math.floor(room))) + "px");
+}
+
 /* one-line titles read "City · Phrase"; when the title would wrap, the bullet is dropped and
    the whole phrase falls to the next line (phrase internals are nbsp-tied by the caller) */
 function setTitle(city, tiedPhrase) {
@@ -1452,6 +1469,7 @@ function render() {
   } else closeCard();                          /* leaving daily mode dismisses the reading card */
   document.title = locLabel(loc, true) + " · Weather Chart";
   renderNow();
+  placeShift();                                /* after renderNow sizes the card, before renderTitle measures beside it */
   renderTitle();                               /* after renderNow: the gap measurement needs the NOW card placed */
   var latN = Math.abs(loc.lat).toFixed(2) + "°" + (loc.lat >= 0 ? "N" : "S");
   var lonW = Math.abs(loc.lon).toFixed(2) + "°" + (loc.lon >= 0 ? "E" : "W");

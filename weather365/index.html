@@ -70,12 +70,11 @@
   .page { margin: 0 auto; padding: 14px 20px 30px; }
   .card { background: var(--surface); border: 1px solid var(--surface-bd); border-radius: 8px; padding: 16px 16px 8px; }
 
-  /* --plotshift is (PADL - PADR) / 2, the distance from the page center to the chart's plot center
-     while the chart fills its box (from ~975px; narrower, the chart keeps its 900px floor and scrolls
-     sideways). The units row's left padding uses it. The script sets it from PADL and PADR at boot;
-     the 17px here is the same value, for the moment before the script runs */
+  /* --plotshift carries the units row from the page center to the chart's plot center (its left
+     padding is twice the shift); placeShift() in the script measures it at boot and on every render.
+     The 16px here is its value while the chart fills its box, for the moment before the script runs */
   header { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: flex-end; margin-bottom: 6px;
-           --plotshift: 17px; }
+           --plotshift: 16px; }
   .titleblock { flex: 1 1 340px; min-width: 260px; }
   h1 { font-size: 22px; font-weight: 600; letter-spacing: .2px; }
   #locmeta { font-size: 12px; color: var(--ink-soft); margin-top: 3px; }
@@ -85,10 +84,9 @@
 
   .searchwrap { position: relative; flex: 0 1 345px; min-width: 250px; }
   /* Imperial | Metric (DESIGN.md section 12): a row of its own centered over the plot - the forecast
-     pages hang it under the NOW card - and on phones straight under the title, the slot the NOW
-     card fills there, so the switch sits in the same place on every page. A left padding of twice
-     --plotshift moves the center onto the plot without the page overflow a transform on a
-     full-width row would cause. */
+     pages hang it under the NOW card, over their own plot - and on phones straight under the title,
+     the slot the NOW card fills there. A left padding of twice --plotshift moves the center onto the
+     plot without the page overflow a transform on a full-width row would cause. */
   #units { order: 1; flex: 0 0 100%; display: flex; justify-content: center; padding-left: calc(2 * var(--plotshift)); }
   @media (max-width: 600px) { #units { order: 0; padding-left: 0; } }
   /* a 13px all-caps pill (per Ken 2026-09-30). The side in force wears the current-page nav chip's
@@ -276,9 +274,6 @@
 "use strict";
 /* ---------- constants ---------- */
 var PADL = 46, PADR = 12, DAYS = 365;
-/* the header's page-center -> plot-center shift, so these constants are its only source (the CSS
-   carries the same value for the moment before this runs) */
-document.querySelector("header").style.setProperty("--plotshift", (PADL - PADR) / 2 + "px");
 var YEAR_START = "2016-01-01", YEAR_END = "2025-12-31", YEARS_LABEL = "2016-2025";
 var MDAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 var MNAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -300,7 +295,22 @@ function applyLayout() {
   BOTTOM = SEC.precip.y + SEC.precip.h;
   SVGH = BOTTOM + 44;
 }
+/* the switch row sits over the chart's plot center as the chart first appears (scrolled to its left
+   edge), measured rather than derived: 16px right of the header's center while the chart fills its box
+   ((PADL - PADR) / 2, less 1 for W's 2px slack), farther right below ~975px, where the chart keeps its
+   900px floor and scrolls sideways. Capped so the switch never passes the header's right edge; phones
+   drop the padding in CSS. Runs at boot, since the switch is on screen before any data, and at the end
+   of every render (data, the units switch, each resize), once the chart has settled the page width. */
+function placeShift() {
+  var hd = document.querySelector("header"), scr = document.querySelector(".scroller"), b = document.querySelectorAll("#units button");
+  if (!hd || !scr || !b.length || PHONE) return;
+  var h = hd.getBoundingClientRect();
+  var want = scr.getBoundingClientRect().left + (W + PADL - PADR) / 2 - (h.left + h.width / 2);
+  var sw = b[b.length - 1].getBoundingClientRect().right - b[0].getBoundingClientRect().left;
+  hd.style.setProperty("--plotshift", Math.min(Math.round(want), Math.floor((h.width - sw) / 2)) + "px");
+}
 applyLayout();
+placeShift();
 /* ---------- chart palette ----------
    The chart is built as an SVG string, so it cannot read the CSS theme tokens: every color it
    paints comes from here instead. Two whole tables rather than one plus a patch, so a series
@@ -692,6 +702,7 @@ function render() {
     ' · <button title="Re-fetch" onclick="loadAverages(true)">refresh</button>';
   renderRecents();
   if (!PHONE) closeCard();                     /* leaving phone mode dismisses the reading card */
+  placeShift();                                /* the chart is in: the page width has settled */
   var scr = document.querySelector(".scroller");
   if (scr && Math.max(PHONE ? 300 : 900, scr.clientWidth - 2) !== W && !inRefit) {
     inRefit = true; render(); inRefit = false;
