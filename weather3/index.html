@@ -82,14 +82,16 @@
   /* grid with equal 1fr side columns puts the conditions card on the true page centerline; minmax(0, ...)
      holds them equal at every width (a plain 1fr let the search box's fixed 345px set its column's
      minimum, starving the title column to 97px at 920 and sliding the card off the plot center).
-     --plotshift is how far the chart's plot center sits right of the page center, (PADL - PADR) / 2
-     in the script; the NOW card, the units switch and the search box's cap all use it. CSS cannot
-     read the script's constants, so a change to either one updates this by hand */
+     --plotshift is (PADL - PADR) / 2, the distance from the page center to the chart's plot center
+     while the chart fills its box (from ~1170px; narrower, the chart keeps its 1080px floor and
+     scrolls sideways, so the card sits left of the plot center). The NOW card, the units switch and
+     the search box's cap all use it. The script sets it from PADL and PADR at boot; the 26px here is
+     the same value, for the moment before the script runs */
   header { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px 18px; align-items: end; margin-bottom: 6px;
            --plotshift: 26px; }
   .titleblock { grid-column: 1; min-width: 0; }
   #nowbox { grid-column: 2; display: none; align-items: center; justify-content: center;
-            transform: translateX(var(--plotshift)); }   /* page center -> chart plot center */
+            transform: translateX(var(--plotshift)); }
   /* row 2: the HRRR label at the left, only as wide as its text (stretched across the row, it made
      the empty space under the NOW card a hidden HRRR switch), and the Imperial | Metric switch
      under the card, on the card's own plot-center shift */
@@ -350,7 +352,10 @@
 var IS3 = location.pathname.indexOf("/weather3") === 0;      /* ONE file serves /weather10/ and /weather3/
                                                                 (byte-identical, tools/gen-weather3.py copies):
                                                                 the URL decides the window, DESIGN.md section 4 */
-var PADL = 64, PADR = 12, HOURS = IS3 ? 72 : 240, DAYSN = HOURS / 24;   /* PADL also holds the drag handles; (PADL - PADR) / 2 is --plotshift in the CSS: update it with these */
+var PADL = 64, PADR = 12, HOURS = IS3 ? 72 : 240, DAYSN = HOURS / 24;   /* PADL also holds the drag handles */
+/* the header's page-center -> plot-center shift, so these constants are its only source (the CSS
+   carries the same value for the moment before this runs) */
+document.querySelector("header").style.setProperty("--plotshift", (PADL - PADR) / 2 + "px");
 /* chart heights are user-resizable via corner grips; the minimum for every row is MINH below.
    Width is automatic: charts fill the browser (1080 floor scrolls sideways on small screens). */
 var STDH = 140;                              /* the standard chart row height (per Ken 2026-08-18) */

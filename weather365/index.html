@@ -70,9 +70,10 @@
   .page { margin: 0 auto; padding: 14px 20px 30px; }
   .card { background: var(--surface); border: 1px solid var(--surface-bd); border-radius: 8px; padding: 16px 16px 8px; }
 
-  /* --plotshift is how far the chart's plot center sits right of the page center, (PADL - PADR) / 2
-     in the script; the units row's left padding uses it. CSS cannot read the script's constants, so
-     a change to either one updates this by hand */
+  /* --plotshift is (PADL - PADR) / 2, the distance from the page center to the chart's plot center
+     while the chart fills its box (from ~975px; narrower, the chart keeps its 900px floor and scrolls
+     sideways). The units row's left padding uses it. The script sets it from PADL and PADR at boot;
+     the 17px here is the same value, for the moment before the script runs */
   header { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: flex-end; margin-bottom: 6px;
            --plotshift: 17px; }
   .titleblock { flex: 1 1 340px; min-width: 260px; }
@@ -274,7 +275,10 @@
 <script>
 "use strict";
 /* ---------- constants ---------- */
-var PADL = 46, PADR = 12, DAYS = 365;   /* (PADL - PADR) / 2 is --plotshift in the CSS: update it with these */
+var PADL = 46, PADR = 12, DAYS = 365;
+/* the header's page-center -> plot-center shift, so these constants are its only source (the CSS
+   carries the same value for the moment before this runs) */
+document.querySelector("header").style.setProperty("--plotshift", (PADL - PADR) / 2 + "px");
 var YEAR_START = "2016-01-01", YEAR_END = "2025-12-31", YEARS_LABEL = "2016-2025";
 var MDAYS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 var MNAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
