@@ -205,11 +205,13 @@ def offline():
             odd = [lab for t in tx for _, lab in t["g"] if not re.match(r"^-?\d+\.\d$", lab) or lab == "-0.0"]
             check("tide (metric): one decimal on every label, and never -0.0", not odd, str(odd[:3]))
 
-    # The caps are load-bearing twice over: they bound the drawn line AND they bound the max that
-    # feeds the ladder, so losing one would ladder the axis to a nonsense top. The sweep above
-    # applies the caps itself, which means it would happily pass on a page that had lost them -
-    # so run the page's OWN scan loops here instead of restating them. (Found the hard way: a
-    # mutation removing Math.min(data.vis[i], 10) was caught only by the weather3 copy tripwire.)
+    # The caps bound the drawn line AND the max that feeds the ladder. Today losing one changes
+    # nothing visible - ladder() hands back its top rung for anything past the second-to-last -
+    # but they turn load-bearing the moment either row gets precip's niceTop fallback (DESIGN.md
+    # section 5). The sweep above applies the caps itself, which means it would happily pass on a
+    # page that had lost them - so run the page's OWN scan loops here instead of restating them.
+    # (Found the hard way: a mutation removing the visibility cap was caught only by the weather3
+    # copy tripwire.)
 
     vis_block = re.search(r"(var vmax = 0, hasVis = false;[\s\S]*?\n  \})", src)
     aqi_block = re.search(r"(var qmax = 0, hasAqi = false;[\s\S]*?\n    \})", src)
@@ -222,7 +224,7 @@ def offline():
             + vis_block.group(1) + "\n" + aqi_block.group(1) + "\n"
             "console.log(JSON.stringify({vmax:vmax, hasVis:hasVis, qmax:qmax, hasAqi:hasAqi}));")
         check("page's own scan caps 67.3 mi at 10", r["vmax"] == 10,
-              "vmax=%s - the Math.min(data.vis[i], 10) cap is gone" % r["vmax"])
+              "vmax=%s - the Math.min(U.d(data.vis[i]), 10) cap is gone" % r["vmax"])
         check("page's own scan pins AQI 260 at 200", r["qmax"] == 200,
               "qmax=%s - the Math.min(data.aqi[i], 200) pin is gone" % r["qmax"])
         check("page's own scan sets hasVis/hasAqi", r["hasVis"] and r["hasAqi"])

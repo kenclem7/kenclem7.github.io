@@ -4,7 +4,7 @@ and confirms the assertion that should have caught it is the one that goes red.
 
   py tools/mutation-check.py          run every mutation, restore the page, report
 
-DESIGN.md section 9 asks for this by hand for any case added to the suite. This is that, written
+DESIGN.md section 10 asks for this by hand for any case added to the suite. This is that, written
 down, because doing it by hand is how you convince yourself an assertion works and skipping it is
 how the suite quietly stops meaning anything. It earned its keep the day it was written: of the
 seven mutations below, two were wrong on the first run - one needle never matched because the
