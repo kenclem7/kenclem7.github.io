@@ -95,6 +95,15 @@
   #units button { position: relative; padding: 0 8px; font: inherit; font-size: 10px; font-weight: 700; line-height: 11px;
                   letter-spacing: .6px; text-transform: uppercase; color: var(--accent); background: var(--field-bg);
                   border: 1px solid var(--field-bd); cursor: pointer; }
+  /* The capitals centered top to bottom (per Ken 2026-10-13): the line box trims to the cap height
+     and 2px of padding goes above and below, still a 13px pill. At 125% screen scaling Segoe UI draws
+     its caps 1.25 screen pixels taller than the font's own cap height, all of it upward, so there they
+     sit half a pixel lower; at 100, 150 and 200% the even split is already centered. The 11px line
+     this replaced left them a screen pixel high at 125%. Browsers without text-box-trim keep it. */
+  @supports (text-box-edge: cap alphabetic) {
+    #units button { padding: 2px 8px; text-box-trim: trim-both; text-box-edge: cap alphabetic; }
+    @media (min-resolution: 1.2dppx) and (max-resolution: 1.3dppx) { #units button { padding: 2.5px 8px 1.5px; } }
+  }
   #units button::before { content: ""; position: absolute; inset: -8px 0; }
   #units button:first-child { border-radius: 3px 0 0 3px; }
   #units button + button { margin-left: -1px; border-radius: 0 3px 3px 0; }   /* one shared seam */

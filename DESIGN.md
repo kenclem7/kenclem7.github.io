@@ -385,7 +385,16 @@ The rows that are not simple conversions, and why:
   tables use. Knots for wind was offered and declined.
 
 **The switch** is a 13px all-caps pill (Ken 2026-09-30), the side in force wearing the current-page nav
-chip's look (accent fill, `--on-accent` ink), so it themes for free. A `::before` stretches its tap target
+chip's look (accent fill, `--on-accent` ink), so it themes for free. Its capitals sit centered top to
+bottom (Ken 2026-10-13): `text-box-trim` cuts the line box to the cap height and 2px of padding goes above
+and below, still 13px. At 125% screen scaling (Ken's) Segoe UI draws its caps 1.25 screen pixels taller than
+its own cap height, all of it upward, so a resolution query moves them half a pixel lower there (2.5px
+above, 1.5 below). Measured at 125% on weather10 and weather365 from 700 to 1500px wide: the old 11px line
+left 1 screen pixel above the caps and 3 below at every width; the even split alone fixed only some
+positions, because 1 CSS px is 1.25 screen pixels and the result depends on where the pill lands; with the
+nudge it is 2 and 2 at every width. At 100, 150 and 200% the even split is centered at every position by
+the same model (the half pixel would put them low there); 175% is predicted slightly off at some
+positions and was not measurable here. Browsers without `text-box-trim` keep the 11px line. A `::before` stretches its tap target
 to 29px without growing the pill - 13px alone is too small for a thumb. Forecast pages: under the NOW card
 (§5). Historical: its own row over the plot center, where a left padding of twice `--plotshift` moves the
 center without the page overflow a transform on a full-width row would cause. `placeShift()` measures the
